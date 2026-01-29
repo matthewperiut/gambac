@@ -92,8 +92,8 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 					setup();
 				}
 			}
-			int x = (int) xpos;
-			int y = Display.getHeight() - (int) ypos; // I don't know why but this un-inverts the y motion of mouse inputs
+			int x = (int) (xpos * Display.getContentScaleX());
+			int y = Display.getHeight() - (int) (ypos * Display.getContentScaleY());
 			double dx = x - last_x;
 			double dy = y - last_y;
 			if (dx != 0 || dy != 0) {

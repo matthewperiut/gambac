@@ -32,11 +32,14 @@ public final class Display {
 	@Nullable
 	private static ByteBuffer[] cached_icons = null;
 	private static boolean focused;
+	private static boolean glfwInitialized = false;
 
 	private Display() {
 	}
 
-	static {
+	public static void ensureInitialized() {
+		if (glfwInitialized) return;
+		glfwInitialized = true;
 		GLFWErrorCallback.createPrint(System.err).set();
 		if (GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
 			GLFW.glfwInitHint(GLFW.GLFW_PLATFORM, GLFW.GLFW_PLATFORM_WAYLAND);
@@ -76,6 +79,11 @@ public final class Display {
 	}
 
 	public static int getWidth() {
+		if (handle != -1L) {
+			int[] w = new int[1];
+			GLFW.glfwGetFramebufferSize(handle, w, null);
+			return w[0];
+		}
 		return width;
 	}
 
@@ -84,6 +92,11 @@ public final class Display {
 	}
 
 	public static int getHeight() {
+		if (handle != -1L) {
+			int[] h = new int[1];
+			GLFW.glfwGetFramebufferSize(handle, null, h);
+			return h[0];
+		}
 		return height;
 	}
 
@@ -109,6 +122,7 @@ public final class Display {
 
 	@Nullable
 	public static DisplayMode getDesktopDisplayMode() {
+		ensureInitialized();
 		long mon = GLFW.glfwGetPrimaryMonitor();
 		GLFWVidMode mode = GLFW.glfwGetVideoMode(mon);
 		if (mode == null) {
@@ -184,6 +198,7 @@ public final class Display {
 	}
 
 	public static void create(@NotNull PixelFormat pixelFormat) throws LWJGLException {
+		ensureInitialized();
 		// Configure GLFW
 		GLFW.glfwDefaultWindowHints();
 
@@ -267,6 +282,7 @@ public final class Display {
 
 	@NotNull
 	public static DisplayMode[] getAvailableDisplayModes() {
+		ensureInitialized();
 		long primaryMonitor = GLFW.glfwGetPrimaryMonitor();
 		if (primaryMonitor == MemoryUtil.NULL) {
 			return new DisplayMode[0];
@@ -333,6 +349,22 @@ public final class Display {
 
 	public static boolean isVisible() {
 		return GLFW.glfwGetWindowAttrib(handle, GLFW.GLFW_VISIBLE) != 0;
+	}
+
+	public static float getContentScaleX() {
+		if (handle == -1L) return 1.0f;
+		int[] fbW = new int[1], winW = new int[1];
+		GLFW.glfwGetFramebufferSize(handle, fbW, null);
+		GLFW.glfwGetWindowSize(handle, winW, null);
+		return winW[0] > 0 ? (float) fbW[0] / winW[0] : 1.0f;
+	}
+
+	public static float getContentScaleY() {
+		if (handle == -1L) return 1.0f;
+		int[] fbH = new int[1], winH = new int[1];
+		GLFW.glfwGetFramebufferSize(handle, null, fbH);
+		GLFW.glfwGetWindowSize(handle, null, winH);
+		return winH[0] > 0 ? (float) fbH[0] / winH[0] : 1.0f;
 	}
 
 	private static void resizeCallback(long window, int width, int height) {

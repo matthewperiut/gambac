@@ -15,6 +15,9 @@
   "environment": "*",
   "accessWidener": "gambac.accessWidener",
   "entrypoints": {
+    "preLaunch": [
+      "net.danygames2014.gambac.GambacPreLaunch"
+    ],
     "stationapi:event_bus": [
     ],
     "stationapi:event_bus_client": [
