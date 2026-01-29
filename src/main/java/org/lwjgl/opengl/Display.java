@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 import net.danygames2014.gambac.lwjgl3compat.DesktopFileInjector;
-import net.danygames2014.gambac.lwjgl3compat.wayland.WaylandPointerWarp;
+import net.danygames2014.gambac.lwjgl3compat.wayland.WaylandCenterCursor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.LWJGLException;
@@ -182,7 +182,7 @@ public final class Display {
 			throw new IllegalStateException("Unable to initialize GLFW");
 		}
 		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND) {
-			WaylandPointerWarp.init();
+			WaylandCenterCursor.init();
 		}
 		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
 			MacOSDisplayHelper.initAppAppearance();
@@ -304,7 +304,23 @@ public final class Display {
 					GLFWImage image = GLFWImage.malloc();
 					int size = buf.limit() / 4;
 					int dimension = (int) Math.sqrt(size);
-					buffer.put(image.set(dimension, dimension, buf));
+
+					// Minecraft provides ARGB pixels; GLFW expects RGBA bytes.
+					// Convert each pixel from ARGB to RGBA byte order.
+					ByteBuffer rgba = ByteBuffer.allocateDirect(buf.limit());
+					int oldPos = buf.position();
+					for (int i = 0; i < size; i++) {
+						int offset = i * 4;
+						byte a = buf.get(offset);
+						byte r = buf.get(offset + 1);
+						byte g = buf.get(offset + 2);
+						byte b = buf.get(offset + 3);
+						rgba.put(r).put(g).put(b).put(a);
+					}
+					buf.position(oldPos);
+					rgba.flip();
+
+					buffer.put(image.set(dimension, dimension, rgba));
 				});
 
 				GLFW.glfwSetWindowIcon(handle, buffer);
@@ -338,6 +354,9 @@ public final class Display {
 		}
 
 		GLFW.glfwSwapBuffers(handle);
+		// After GLFW commits the surface via swapBuffers, dispatch any
+		// pending cursor warp so the lock callback fires.
+		WaylandCenterCursor.finishWarp();
 	}
 
 	public static void create() {
@@ -460,7 +479,7 @@ public final class Display {
 		if (usingGlfwAsync && GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
 			MacOSDisplayHelper.unlockCGLContext();
 		}
-		WaylandPointerWarp.destroy();
+		WaylandCenterCursor.destroy();
 		// free callbacks
 		assert sizeCallback != null;
 		sizeCallback.free();

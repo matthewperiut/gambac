@@ -43,8 +43,6 @@ import net.danygames2014.gambac.lwjgl3compat.implementation.LWJGLImplementationU
 import org.lwjgl.opengl.Display;
 import net.danygames2014.gambac.lwjgl3compat.implementation.input.InputImplementation;
 
-import static net.danygames2014.gambac.lwjgl3compat.implementation.glfw.GLFWMouseImplementation.isWayland;
-import net.danygames2014.gambac.lwjgl3compat.wayland.WaylandPointerWarp;
 
 
 /**
@@ -656,15 +654,7 @@ public class Mouse {
                     grab_y = y;
                 }
                 else if (!grab && grabbed) {
-                    // On Wayland without wp_pointer_warp_v1, cursor position hint
-                    // must be set while still in DISABLED mode (before grabMouse
-                    // switches to NORMAL). The hint was already set by the caller
-                    // via setCursorPosition(), so skip overwriting it here.
-                    // With wp_pointer_warp_v1, we can warp after ungrab.
-                    // On X11/Win/Mac, warp after ungrab via glfwSetCursorPos.
-                    if (!isWayland() || WaylandPointerWarp.isSupported()) {
-                        implementation.setCursorPosition(grab_x, grab_y);
-                    }
+                    implementation.setCursorPosition(grab_x, grab_y);
                 }
 
                 implementation.grabMouse(grab);

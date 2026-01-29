@@ -57,6 +57,8 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 	private double last_y;
 	private double accum_dx, accum_dy, accum_dz;
 	private double virt_offset_x, virt_offset_y;
+	private double edgeForce;
+	private static final double EDGE_RELEASE_THRESHOLD = 150.0;
 	private int current;
 	private int[] images = new int[]{-1};
 	private long animationTime;
@@ -104,22 +106,35 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 				last_y = y;
 
 				if (virtual) {
+					double vx = getX();
+					double vy = getY();
+					boolean atEdge = false;
 
-					/*
-					 * Stop the virtual cursor from leaving the screen entirely
-					 */
-					while (getX() <= 0) { // TODO get rid if the loops. loops are bad here.
-						virt_offset_x++;
-					}
-					while (getX() > Display.getWidth()) {
-						virt_offset_x--;
+					// Clamp virtual cursor to window bounds
+					if (vx <= 0) {
+						virt_offset_x += -vx + 1;
+						atEdge = true;
+					} else if (vx > Display.getWidth()) {
+						virt_offset_x -= vx - Display.getWidth();
+						atEdge = true;
 					}
 
-					while (getY() < 0) {
-						virt_offset_y++;
+					if (vy < 0) {
+						virt_offset_y += -vy;
+						atEdge = true;
+					} else if (vy > Display.getHeight() - 1) {
+						virt_offset_y -= vy - (Display.getHeight() - 1);
+						atEdge = true;
 					}
-					while (getY() > Display.getHeight() - 1) {
-						virt_offset_y--;
+
+					// Accumulate edge force; release to real cursor if enough
+					if (atEdge) {
+						edgeForce += Math.sqrt(dx * dx + dy * dy);
+						if (edgeForce >= EDGE_RELEASE_THRESHOLD) {
+							releaseToRealCursor();
+						}
+					} else {
+						edgeForce = 0;
 					}
 				}
 
@@ -148,6 +163,12 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 
 
 		created = false;
+	}
+
+	private void releaseToRealCursor() {
+		virtual = false;
+		edgeForce = 0;
+		GLFW.glfwSetInputMode(this.windowHandle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
 	}
 
 	private boolean mayVirtualize() {
@@ -244,7 +265,7 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 			virtual = false;
 		} else {
 			if (isValidScreen() && mayVirtualize()) {
-				//virt_offset_x = virt_offset_y = 0;
+				edgeForce = 0;
 				virtual = true;
 			} else {
 				GLFW.glfwSetInputMode(this.windowHandle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
@@ -274,6 +295,8 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 	 */
 	private void draw() {
 		if (virtual && images[0] != -1) {
+			GL11.glDisable(GL11.GL_LIGHTING);
+			GL11.glDisable(GL11.GL_DEPTH_TEST);
 			GlStateManager.enableTexture();
 			GlStateManager.enableAlphaTest();
 			GlStateManager.enableBlend();
