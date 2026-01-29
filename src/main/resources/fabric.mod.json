@@ -4,7 +4,7 @@
   "version": "${version}",
 
   "name": "Gambac",
-  "description": "deAWTs the game and fixes colors being inverted on Apple Silicon chips",
+  "description": "deAWTs the game, fixes colors being inverted on Apple Silicon chips, and provides LWJGL3 support via GLFW",
   "authors": [
     "DanyGames2014"
   ],
@@ -27,6 +27,7 @@
   ],
 
   "depends": {
-    "minecraft": "1.0.0-beta.7.3"
+    "minecraft": "1.0.0-beta.7.3",
+    "java": ">=17"
   }
 }

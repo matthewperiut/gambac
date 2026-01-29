@@ -1,0 +1,8 @@
+package net.danygames2014.gambac.lwjgl3compat.implementation.input;
+
+/**
+ * @author Zarzelcow
+ * @created 28/09/2022 - 2:14 PM
+ */
+public interface InputImplementation extends KeyboardImplementation, MouseImplementation {
+}

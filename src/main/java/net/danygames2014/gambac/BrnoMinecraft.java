@@ -53,9 +53,8 @@ public class BrnoMinecraft extends Minecraft {
 
     @Override
     public void init() throws LWJGLException {
-        Display.setResizable(true);
         super.init();
-        
+
         // Window Title
         try {
             if (System.getProperty("org.prismlauncher.window.title") != null && System.getProperty("gambacUsePrismTitle") != null) {
@@ -80,16 +79,6 @@ public class BrnoMinecraft extends Minecraft {
 
         if (icons[0] != null && icons[1] != null) {
             Display.setIcon(icons);
-        }
-
-        // Make the display current
-        try {
-            Display.makeCurrent();
-            Display.update();
-        } catch (LWJGLException e) {
-            System.err.println("Error while making the Display current");
-            //noinspection CallToPrintStackTrace
-            e.printStackTrace();
         }
     }
 
