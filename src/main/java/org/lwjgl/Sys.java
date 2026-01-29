@@ -31,7 +31,7 @@
  */
 package org.lwjgl;
 
-import net.danygames2014.gambac.lwjgl3compat.util.OS;
+import com.periut.starac.lwjgl3compat.util.OS;
 
 /**
  * Created by gudenau on 5/30/2017.

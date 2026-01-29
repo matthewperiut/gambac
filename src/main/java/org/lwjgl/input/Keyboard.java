@@ -35,9 +35,9 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.Sys;
 import org.lwjgl.glfw.GLFW;
-import net.danygames2014.gambac.lwjgl3compat.implementation.LWJGLImplementationUtils;
+import com.periut.starac.lwjgl3compat.implementation.LWJGLImplementationUtils;
 import org.lwjgl.opengl.Display;
-import net.danygames2014.gambac.lwjgl3compat.implementation.input.InputImplementation;
+import com.periut.starac.lwjgl3compat.implementation.input.InputImplementation;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;

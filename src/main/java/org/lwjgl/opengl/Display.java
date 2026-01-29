@@ -1,6 +1,5 @@
 package org.lwjgl.opengl;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -9,8 +8,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import net.danygames2014.gambac.lwjgl3compat.DesktopFileInjector;
-import net.danygames2014.gambac.lwjgl3compat.wayland.WaylandCenterCursor;
+import com.periut.starac.lwjgl3compat.DesktopFileInjector;
+import com.periut.starac.lwjgl3compat.wayland.WaylandCenterCursor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.LWJGLException;
@@ -20,7 +19,6 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
-import java.lang.reflect.Method;
 
 public final class Display {
 	@NotNull

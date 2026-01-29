@@ -1,22 +1,23 @@
 {
   "schemaVersion": 1,
-  "id": "gambac",
+  "id": "starac",
   "version": "${version}",
 
-  "name": "Gambac",
-  "description": "deAWTs the game, fixes colors being inverted on Apple Silicon chips, and provides LWJGL3 support via GLFW",
+  "name": "Staráč",
+  "description": "Modernizes Minecraft Beta libraries for the best experience on modern OSes",
   "authors": [
+    "Slainlight",
     "DanyGames2014"
   ],
 
   "license": "MIT",
-  "icon": "assets/gambac/icon.png",
+  "icon": "assets/starac/icon.png",
 
   "environment": "*",
-  "accessWidener": "gambac.accessWidener",
+  "accessWidener": "starac.accessWidener",
   "entrypoints": {
     "preLaunch": [
-      "net.danygames2014.gambac.GambacPreLaunch"
+      "com.periut.starac.StaracPreLaunch"
     ],
     "stationapi:event_bus": [
     ],
@@ -26,11 +27,11 @@
     ]
   },
   "mixins": [
-    "gambac.mixins.json"
+    "starac.mixins.json"
   ],
 
   "depends": {
     "minecraft": "1.0.0-beta.7.3",
-    "java": ">=17"
+    "java": ">=21"
   }
 }

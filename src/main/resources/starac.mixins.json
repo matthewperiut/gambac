@@ -1,0 +1,31 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.periut.starac.mixin",
+  "plugin": "com.periut.starac.lwjgl3compat.Lwjgl3MixinPostProcessor",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+  ],
+  "server": [
+  ],
+  "client": [
+    "MinecraftAppletMixin",
+    "MinecraftMixin",
+    "MouseHelperMixin",
+    "lwjgl3.GL11Mixin",
+    "lwjgl3.GL20Mixin",
+    "lwjgl3.ALMixin",
+    "lwjgl3.AL10Mixin",
+    "lwjgl3.ARBOcclusionQueryMixin",
+    "lwjgl3.ARBShaderObjectsMixin",
+    "lwjgl3.GLCapabilitiesMixin",
+    "lwjgl3.LibraryLWJGLOpenALMixin",
+    "lwjgl3.MinecraftAccessor",
+    "lwjgl3.MixinMinecraftDrawVirtualCursor",
+    "lwjgl3.MixinResourceDownloadThread",
+    "lwjgl3.MixinScreenFixClipboard"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
