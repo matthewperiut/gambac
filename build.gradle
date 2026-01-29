@@ -7,7 +7,7 @@ plugins {
 base {
 	archivesName = project.archives_base_name
 }
-version = "${project.version}+mc${project.minecraft_version}"
+version = "${project.mod_version}+mc${project.minecraft_version}"
 group = project.maven_group
 
 ploceus {
@@ -15,7 +15,7 @@ ploceus {
 }
 
 loom {
-	accessWidenerPath = file("src/main/resources/gambac.accesswidener")
+	accessWidenerPath = file("src/main/resources/gambac.accessWidener")
 }
 
 repositories {
@@ -66,7 +66,7 @@ java {
 
 tasks.withType(Jar).configureEach {
 	from("LICENSE") {
-		rename { "${it}_${project.archivesBaseName}"}
+		rename { "${it}_${project.archives_base_name}"}
 	}
 }
 
