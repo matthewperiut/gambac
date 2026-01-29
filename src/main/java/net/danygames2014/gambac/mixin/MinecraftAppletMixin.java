@@ -3,7 +3,7 @@ package net.danygames2014.gambac.mixin;
 import net.danygames2014.gambac.BrnoMinecraft;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MinecraftApplet;
-import net.minecraft.client.util.Session;
+import net.minecraft.client.Session;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
@@ -64,7 +64,7 @@ public class MinecraftAppletMixin extends Applet {
             this.minecraft.session = new Session(this.getParameter("username"), this.getParameter("sessionid"));
             System.out.println("Setting user: " + this.minecraft.session.username);
             if (this.getParameter("mppass") != null) {
-                this.minecraft.session.mpPass = this.getParameter("mppass");
+                this.minecraft.session.password = this.getParameter("mppass");
             }
         } else {
             this.minecraft.session = new Session("Player" + System.currentTimeMillis() % 10000, "");

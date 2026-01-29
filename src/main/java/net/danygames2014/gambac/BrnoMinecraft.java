@@ -2,7 +2,7 @@ package net.danygames2014.gambac;
 
 import net.minecraft.client.CrashReportPanel;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.util.ScreenScaler;
+import net.minecraft.client.render.Window;
 import net.minecraft.util.crash.CrashReport;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
@@ -37,7 +37,7 @@ public class BrnoMinecraft extends Minecraft {
         this.frame.removeAll();
         this.frame.add(new CrashReportPanel(throwable), "Center");
         this.frame.validate();
-        this.frame.setSize(this.displayWidth, this.displayHeight);
+        this.frame.setSize(this.width, this.height);
         this.frame.setLocationRelativeTo(null);
         this.frame.setAutoRequestFocus(true);
         this.frame.addWindowListener(new WindowAdapter() {
@@ -52,7 +52,7 @@ public class BrnoMinecraft extends Minecraft {
     }
 
     @Override
-    public void init() {
+    public void init() throws LWJGLException {
         Display.setResizable(true);
         super.init();
         
@@ -100,7 +100,7 @@ public class BrnoMinecraft extends Minecraft {
             GL11.glEnable(GL30.GL_FRAMEBUFFER_SRGB);
         }
 
-        if (Display.getWidth() != this.displayWidth || Display.getHeight() != this.displayHeight) {
+        if (Display.getWidth() != this.width || Display.getHeight() != this.height) {
             this.resize(Display.getWidth(), Display.getHeight());
         }
 
@@ -148,24 +148,24 @@ public class BrnoMinecraft extends Minecraft {
                 this.previousHeight = Display.getHeight();
 
                 Display.setDisplayMode(Display.getDesktopDisplayMode());
-                this.displayWidth = Display.getDisplayMode().getWidth();
-                this.displayHeight = Display.getDisplayMode().getHeight();
+                this.width = Display.getDisplayMode().getWidth();
+                this.height = Display.getDisplayMode().getHeight();
             } else {
-                this.displayWidth = this.previousWidth;
-                this.displayHeight = this.previousHeight;
-                Display.setDisplayMode(new DisplayMode(this.displayWidth, this.displayHeight));
+                this.width = this.previousWidth;
+                this.height = this.previousHeight;
+                Display.setDisplayMode(new DisplayMode(this.width, this.height));
             }
 
-            if (this.displayWidth <= 0) {
-                this.displayWidth = 1;
+            if (this.width <= 0) {
+                this.width = 1;
             }
 
-            if (this.displayHeight <= 0) {
-                this.displayHeight = 1;
+            if (this.height <= 0) {
+                this.height = 1;
             }
 
-            if (this.currentScreen != null) {
-                this.resize(this.displayWidth, this.displayHeight);
+            if (this.screen != null) {
+                this.resize(this.width, this.height);
             }
 
             Display.setFullscreen(this.fullscreen);
@@ -185,13 +185,13 @@ public class BrnoMinecraft extends Minecraft {
             height = 1;
         }
 
-        this.displayWidth = width;
-        this.displayHeight = height;
-        if (this.currentScreen != null) {
-            ScreenScaler scaler = new ScreenScaler(this.options, width, height);
-            int scaledWidth = scaler.getScaledWidth();
-            int scaledHeight = scaler.getScaledHeight();
-            this.currentScreen.init(this, scaledWidth, scaledHeight);
+        this.width = width;
+        this.height = height;
+        if (this.screen != null) {
+            Window scaler = new Window(this.options, width, height);
+            int scaledWidth = scaler.getWidth();
+            int scaledHeight = scaler.getHeight();
+            this.screen.init(this, scaledWidth, scaledHeight);
         }
     }
 }
