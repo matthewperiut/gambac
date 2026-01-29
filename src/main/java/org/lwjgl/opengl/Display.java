@@ -14,6 +14,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
+import java.lang.reflect.Method;
 
 public final class Display {
 	@NotNull
@@ -33,6 +34,7 @@ public final class Display {
 	private static ByteBuffer[] cached_icons = null;
 	private static boolean focused;
 	private static boolean glfwInitialized = false;
+	private static boolean usingGlfwAsync = false;
 
 	private Display() {
 	}
@@ -40,12 +42,16 @@ public final class Display {
 	public static void ensureInitialized() {
 		if (glfwInitialized) return;
 		glfwInitialized = true;
+		usingGlfwAsync = "glfw_async".equals(org.lwjgl.system.Configuration.GLFW_LIBRARY_NAME.get());
 		GLFWErrorCallback.createPrint(System.err).set();
 		if (GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
 			GLFW.glfwInitHint(GLFW.GLFW_PLATFORM, GLFW.GLFW_PLATFORM_WAYLAND);
 		}
 		if (!GLFW.glfwInit()) {
 			throw new IllegalStateException("Unable to initialize GLFW");
+		}
+		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
+			MacOSDisplayHelper.initAppAppearance();
 		}
 	}
 
@@ -177,7 +183,18 @@ public final class Display {
 
 	public static void update() {
 		window_resized = false;
-		GLFW.glfwPollEvents();
+		if (usingGlfwAsync) {
+			// Unlock the CGL context so the macOS compositor can safely access
+			// the GL surface during event processing (e.g. window resize).
+			// Without this, the compositor and game thread race on the GL
+			// surface, causing SIGSEGV in AppleMetalOpenGLRenderer.
+			GL11.glFinish();
+			MacOSDisplayHelper.unlockCGLContext();
+			GLFW.glfwPollEvents();
+			MacOSDisplayHelper.relockCGLContext();
+		} else {
+			GLFW.glfwPollEvents();
+		}
 		if (Mouse.isCreated()) {
 			Mouse.poll();
 		}
@@ -242,6 +259,12 @@ public final class Display {
 		if (cached_icons != null) {
 			setIcon(cached_icons);
 		}
+		if (usingGlfwAsync && GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
+			// Lock the CGL context for the game thread. This is unlocked
+			// around glfwPollEvents in update() so the compositor can
+			// safely access the GL surface during resize.
+			MacOSDisplayHelper.lockCGLContext(handle);
+		}
 	}
 
 	public static void setFullscreen(boolean fullscreen) {
@@ -299,6 +322,9 @@ public final class Display {
 	}
 
 	public static void destroy() {
+		if (usingGlfwAsync && GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
+			MacOSDisplayHelper.unlockCGLContext();
+		}
 		// free callbacks
 		assert sizeCallback != null;
 		sizeCallback.free();
