@@ -42,7 +42,18 @@ public abstract class MinecraftMixin {
         canvas = null;
     }
 
-    // Force update screen size at end of init
+    // Force update screen size right after Display is created, so the Mojang
+    // loading screen renders at the correct scale on HiDPI/Retina displays
+    @Inject(method = "init", at = @At(value = "INVOKE", target = "Lorg/lwjgl/opengl/Display;create()V", shift = At.Shift.AFTER, remap = false))
+    private void forceUpdateScreenSizeEarly(CallbackInfo ci) {
+        GLFW.glfwPollEvents();
+        this.width = Display.getWidth();
+        this.height = Display.getHeight();
+        if (this.width <= 0) this.width = 1;
+        if (this.height <= 0) this.height = 1;
+    }
+
+    // Also force update at end of init for good measure
     @Inject(method = "init", at = @At("TAIL"))
     private void forceUpdateScreenSize(CallbackInfo ci) {
         GLFW.glfwPollEvents();
