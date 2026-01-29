@@ -1,6 +1,7 @@
 package net.danygames2014.gambac.lwjgl3compat.implementation.glfw;
 
 import net.danygames2014.gambac.lwjgl3compat.implementation.input.MouseImplementation;
+import net.danygames2014.gambac.lwjgl3compat.wayland.WaylandPointerWarp;
 import org.lwjgl.glfw.*;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
@@ -131,17 +132,52 @@ public class GLFWMouseImplementation implements MouseImplementation {
         // Convert from framebuffer coordinates back to screen coordinates for GLFW
         double screenX = x / Display.getContentScaleX();
         double screenY = (Display.getHeight() - y) / Display.getContentScaleY();
-        GLFW.glfwSetCursorPos(this.windowHandle, screenX, screenY);
+
+        if (isWayland() && !grabbed && WaylandPointerWarp.isSupported()) {
+            // wp_pointer_warp_v1: warp visible cursor on Wayland
+            WaylandPointerWarp.warpCursor(screenX, screenY);
+        } else {
+            GLFW.glfwSetCursorPos(this.windowHandle, screenX, screenY);
+        }
     }
 
     @Override
     public void grabMouse(boolean grab) {
+        if (!grab && grabbed) {
+            double screenX = last_x / Display.getContentScaleX();
+            double screenY = (Display.getHeight() - last_y) / Display.getContentScaleY();
+
+            if (isWayland() && !WaylandPointerWarp.isSupported()) {
+                // Fallback: set cursor position hint BEFORE switching to NORMAL.
+                // On Wayland without wp_pointer_warp_v1, glfwSetCursorPos while
+                // DISABLED uses set_cursor_position_hint so the compositor places
+                // the cursor at this position when the pointer lock is released.
+                GLFW.glfwSetCursorPos(this.windowHandle, screenX, screenY);
+            } else if (!isWayland()) {
+                // X11/Win/Mac: set hint before ungrab too (harmless)
+                GLFW.glfwSetCursorPos(this.windowHandle, screenX, screenY);
+            }
+            // If wp_pointer_warp_v1 is supported, warp happens via
+            // setCursorPosition() after ungrab.
+        }
         GLFW.glfwSetInputMode(this.windowHandle, GLFW.GLFW_CURSOR, grab ? GLFW.GLFW_CURSOR_DISABLED : GLFW.GLFW_CURSOR_NORMAL);
-        if (!grab) {
-            GLFW.glfwSetCursorPos(this.windowHandle, last_x, last_y);
+        if (!grab && !isWayland()) {
+            double screenX = last_x / Display.getContentScaleX();
+            double screenY = (Display.getHeight() - last_y) / Display.getContentScaleY();
+            GLFW.glfwSetCursorPos(this.windowHandle, screenX, screenY);
+        }
+        if (!grab && isWayland() && WaylandPointerWarp.isSupported()) {
+            // wp_pointer_warp_v1: warp cursor after switching to NORMAL
+            double screenX = last_x / Display.getContentScaleX();
+            double screenY = (Display.getHeight() - last_y) / Display.getContentScaleY();
+            WaylandPointerWarp.warpCursor(screenX, screenY);
         }
         this.grabbed = grab;
         this.reset();
+    }
+
+    public static boolean isWayland() {
+        return GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND;
     }
 
     @Override

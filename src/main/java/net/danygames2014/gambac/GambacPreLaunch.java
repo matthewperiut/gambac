@@ -6,10 +6,50 @@ import org.lwjgl.system.Configuration;
 public class GambacPreLaunch implements PreLaunchEntrypoint {
 	@Override
 	public void onPreLaunch() {
-		if (!System.getProperty("os.name", "").toLowerCase().contains("mac")) {
+		String os = System.getProperty("os.name", "").toLowerCase();
+
+		if (os.contains("linux")) {
+			setupLinux();
+		} else if (os.contains("mac")) {
+			setupMacOS();
+		}
+	}
+
+	private void setupLinux() {
+		// GNOME lacks server-side decorations, so GLFW relies on libdecor's GTK
+		// plugin for client-side decorations. The LWJGL-bundled GLFW has a
+		// different libdecor build, so use the system GLFW on GNOME Wayland.
+		String waylandDisplay = System.getenv("WAYLAND_DISPLAY");
+		if (waylandDisplay == null || waylandDisplay.isEmpty()) {
 			return;
 		}
 
+		String desktop = System.getenv("XDG_CURRENT_DESKTOP");
+		if (desktop == null || !desktop.toUpperCase().contains("GNOME")) {
+			return;
+		}
+
+		String arch = System.getProperty("os.arch", "");
+		String libDir = arch.contains("aarch64") ? "/usr/lib/aarch64-linux-gnu" : "/usr/lib";
+
+		// Try common system GLFW paths
+		String[] candidates = {
+			libDir + "/libglfw.so.3",
+			libDir + "/libglfw.so",
+			"/usr/lib64/libglfw.so.3",
+			"/usr/lib64/libglfw.so",
+		};
+
+		for (String path : candidates) {
+			if (new java.io.File(path).exists()) {
+				Configuration.GLFW_LIBRARY_NAME.set(path);
+				System.out.println("[Gambac] GNOME Wayland detected, using system GLFW: " + path);
+				return;
+			}
+		}
+	}
+
+	private void setupMacOS() {
 		// Check if -XstartOnFirstThread is already active
 		long pid = ProcessHandle.current().pid();
 		if ("1".equals(System.getenv("JAVA_STARTED_ON_FIRST_THREAD_" + pid))) {

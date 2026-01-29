@@ -1,10 +1,16 @@
 package org.lwjgl.opengl;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Comparator;
 
 import net.danygames2014.gambac.lwjgl3compat.DesktopFileInjector;
+import net.danygames2014.gambac.lwjgl3compat.wayland.WaylandPointerWarp;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.LWJGLException;
@@ -39,16 +45,144 @@ public final class Display {
 	private Display() {
 	}
 
+	private static boolean isGnome() {
+		String desktop = System.getenv("XDG_CURRENT_DESKTOP");
+		return desktop != null && desktop.toUpperCase().contains("GNOME");
+	}
+
+	/**
+	 * Sets XCURSOR_THEME and XCURSOR_SIZE from gsettings so GLFW uses the
+	 * user's configured cursor theme on Wayland. GNOME (and some other DEs)
+	 * set the cursor via gsettings but don't export the env vars.
+	 */
+	private static void setupCursorTheme() {
+		try {
+			// Skip if already set
+			if (System.getenv("XCURSOR_THEME") != null) {
+				return;
+			}
+
+			org.lwjgl.system.SharedLibrary libc = org.lwjgl.system.APIUtil.apiCreateLibrary("libc.so.6");
+			long setenv = libc.getFunctionAddress("setenv");
+			if (setenv == 0) return;
+
+			// Read cursor theme from gsettings
+			try {
+				Process p = new ProcessBuilder("gsettings", "get", "org.gnome.desktop.interface", "cursor-theme").start();
+				String output = new String(p.getInputStream().readAllBytes()).trim();
+				p.waitFor();
+				// gsettings wraps in single quotes: 'Adwaita'
+				if (output.contains("'")) {
+					String theme = output.split("'")[1];
+					nativeSetenv(setenv, "XCURSOR_THEME", theme);
+					System.out.println("[Gambac] Set XCURSOR_THEME=" + theme);
+				}
+			} catch (Exception ignored) {}
+
+			// Read cursor size
+			if (System.getenv("XCURSOR_SIZE") == null) {
+				try {
+					Process p = new ProcessBuilder("gsettings", "get", "org.gnome.desktop.interface", "cursor-size").start();
+					String output = new String(p.getInputStream().readAllBytes()).trim();
+					p.waitFor();
+					if (!output.isEmpty()) {
+						nativeSetenv(setenv, "XCURSOR_SIZE", output);
+						System.out.println("[Gambac] Set XCURSOR_SIZE=" + output);
+					}
+				} catch (Exception ignored) {}
+			}
+		} catch (Exception e) {
+			System.out.println("[Gambac] Could not setup cursor theme: " + e.getMessage());
+		}
+	}
+
+	private static void nativeSetenv(long setenvAddr, String name, String value) {
+		ByteBuffer nameBuf = MemoryUtil.memASCII(name, true);
+		ByteBuffer valueBuf = MemoryUtil.memASCII(value, true);
+		org.lwjgl.system.JNI.invokePPI(MemoryUtil.memAddress(nameBuf), MemoryUtil.memAddress(valueBuf), 1, setenvAddr);
+		MemoryUtil.memFree(nameBuf);
+		MemoryUtil.memFree(valueBuf);
+	}
+
+	/**
+	 * Sets up native Wayland decorations by:
+	 * 1. Extracting a patched libdecor-gtk plugin (thread check removed)
+	 * 2. Setting GDK_BACKEND=wayland so GTK initializes correctly
+	 * 3. Setting LIBDECOR_PLUGIN_DIR to point to our patched plugin
+	 */
+	private static void setupLibdecorPlugin() {
+		try {
+			org.lwjgl.system.SharedLibrary libc = org.lwjgl.system.APIUtil.apiCreateLibrary("libc.so.6");
+			long setenv = libc.getFunctionAddress("setenv");
+			if (setenv == 0) {
+				System.out.println("[Gambac] Could not find setenv in libc");
+				return;
+			}
+
+			// Force GTK to use Wayland backend, otherwise gtk_init fails
+			nativeSetenv(setenv, "GDK_BACKEND", "wayland");
+			System.out.println("[Gambac] Set GDK_BACKEND=wayland");
+
+			// Extract patched libdecor-gtk plugin
+			String arch = System.getProperty("os.arch", "");
+			String nativeDir;
+			if (arch.contains("aarch64") || arch.contains("arm64")) {
+				nativeDir = "natives/linux-aarch64";
+			} else {
+				nativeDir = "natives/linux-x86_64";
+			}
+
+			String resource = "/" + nativeDir + "/libdecor-gtk.so";
+			try (InputStream in = Display.class.getResourceAsStream(resource)) {
+				if (in == null) {
+					System.out.println("[Gambac] Patched libdecor-gtk plugin not found for " + arch);
+					return;
+				}
+
+				Path pluginDir = Files.createTempDirectory("gambac-libdecor");
+				Path pluginFile = pluginDir.resolve("libdecor-gtk.so");
+				Files.copy(in, pluginFile, StandardCopyOption.REPLACE_EXISTING);
+				pluginFile.toFile().setExecutable(true);
+				pluginDir.toFile().deleteOnExit();
+				pluginFile.toFile().deleteOnExit();
+
+				// Copy the system cairo plugin as fallback (e.g. if GTK3 is not installed)
+				Path systemCairo = Path.of("/usr/lib/libdecor/plugins-1/libdecor-cairo.so");
+				if (Files.exists(systemCairo)) {
+					Path cairoCopy = pluginDir.resolve("libdecor-cairo.so");
+					Files.copy(systemCairo, cairoCopy, StandardCopyOption.REPLACE_EXISTING);
+					cairoCopy.toFile().deleteOnExit();
+				}
+
+				nativeSetenv(setenv, "LIBDECOR_PLUGIN_DIR", pluginDir.toAbsolutePath().toString());
+				System.out.println("[Gambac] Set LIBDECOR_PLUGIN_DIR=" + pluginDir.toAbsolutePath());
+			}
+		} catch (Exception e) {
+			System.out.println("[Gambac] Could not setup libdecor plugin: " + e.getMessage());
+		}
+	}
+
 	public static void ensureInitialized() {
 		if (glfwInitialized) return;
 		glfwInitialized = true;
 		usingGlfwAsync = "glfw_async".equals(org.lwjgl.system.Configuration.GLFW_LIBRARY_NAME.get());
 		GLFWErrorCallback.createPrint(System.err).set();
 		if (GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
+			setupCursorTheme();
+			// GNOME is the only major compositor lacking xdg-decoration (server-side
+			// decorations), so it needs a patched libdecor-gtk plugin. Other compositors
+			// (KDE, Sway, etc.) handle decorations natively.
+			if (isGnome()) {
+				setupLibdecorPlugin();
+			}
 			GLFW.glfwInitHint(GLFW.GLFW_PLATFORM, GLFW.GLFW_PLATFORM_WAYLAND);
+			GLFW.glfwInitHint(GLFW.GLFW_WAYLAND_LIBDECOR, GLFW.GLFW_WAYLAND_PREFER_LIBDECOR);
 		}
 		if (!GLFW.glfwInit()) {
 			throw new IllegalStateException("Unable to initialize GLFW");
+		}
+		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND) {
+			WaylandPointerWarp.init();
 		}
 		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
 			MacOSDisplayHelper.initAppAppearance();
@@ -236,6 +370,7 @@ public final class Display {
 		GLFW.glfwWindowHint(GLFW.GLFW_STENCIL_BITS, pixelFormat.getStencilBits());
 		GLFW.glfwWindowHint(GLFW.GLFW_STEREO, pixelFormat.isStereo() ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
 
+		GLFW.glfwWindowHint(GLFW.GLFW_DECORATED, GLFW.GLFW_TRUE);
 		GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, 0);
 		GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, 1);
 		handle =
@@ -325,6 +460,7 @@ public final class Display {
 		if (usingGlfwAsync && GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
 			MacOSDisplayHelper.unlockCGLContext();
 		}
+		WaylandPointerWarp.destroy();
 		// free callbacks
 		assert sizeCallback != null;
 		sizeCallback.free();

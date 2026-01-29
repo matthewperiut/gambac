@@ -16,7 +16,6 @@ import java.util.List;
 import net.danygames2014.gambac.lwjgl3compat.implementation.input.MouseImplementation;
 import net.danygames2014.gambac.mixin.lwjgl3.MinecraftAccessor;
 import net.danygames2014.gambac.lwjgl3compat.util.GlStateManager;
-import net.danygames2014.gambac.lwjgl3compat.util.TextureUtil;
 import net.danygames2014.gambac.lwjgl3compat.util.XDGPathResolver;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -34,6 +33,7 @@ import org.lwjgl.glfw.*;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.EventQueue;
+import org.lwjgl.opengl.GL11;
 
 /**
  * @author moehreag
@@ -277,7 +277,8 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 			GlStateManager.enableTexture();
 			GlStateManager.enableAlphaTest();
 			GlStateManager.enableBlend();
-			GlStateManager.color3f(1, 1, 1);
+			GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+			GlStateManager.color4f(1, 1, 1, 1);
 			GlStateManager.bindTexture(images[current]);
 
 			var mc = MinecraftAccessor.getInstance();
@@ -343,10 +344,35 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 		images = new int[chunks.size()];
 		for (int i = 0; i < images.length; i++) {
 			XCursor.ImageChunk c = chunks.get(i);
-			int id = TextureUtil.genTextures();
+			int id = GlStateManager.genTextures();
 			images[i] = id;
-			TextureUtil.prepare(id, (int) c.width, (int) c.height);
-			TextureUtil.uploadTexture(id, c.getImage(), (int) c.width, (int) c.height);
+			GlStateManager.bindTexture(id);
+
+			int w = (int) c.width;
+			int h = (int) c.height;
+			long[] pixels = c.getPixels();
+
+			// Upload as GL_RGBA + GL_UNSIGNED_BYTE with explicit byte order.
+			// XCursor stores premultiplied ARGB; un-premultiply to straight RGBA.
+			ByteBuffer rgbaBuf = ByteBuffer.allocateDirect(w * h * 4);
+			for (long pixel : pixels) {
+				int a = (int) ((pixel >> 24) & 0xFF);
+				int r = (int) ((pixel >> 16) & 0xFF);
+				int g = (int) ((pixel >> 8) & 0xFF);
+				int b = (int) (pixel & 0xFF);
+				if (a > 0 && a < 255) {
+					r = Math.min(255, r * 255 / a);
+					g = Math.min(255, g * 255 / a);
+					b = Math.min(255, b * 255 / a);
+				}
+				rgbaBuf.put((byte) r).put((byte) g).put((byte) b).put((byte) a);
+			}
+			rgbaBuf.flip();
+
+			GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+			GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+			GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, w, h, 0,
+					GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, rgbaBuf);
 		}
 	}
 
@@ -687,7 +713,18 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 				int[] data = new int[pixels.length];
 
 				for (int i = 0; i < pixels.length; i++) {
-					data[i] = (int) pixels[i];
+					// XCursor stores premultiplied alpha (ARGB).
+					// OpenGL's default blend (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
+					// expects straight alpha, so un-premultiply here.
+					int pixel = (int) pixels[i];
+					int a = (pixel >> 24) & 0xFF;
+					if (a > 0 && a < 255) {
+						int r = Math.min(255, ((pixel >> 16) & 0xFF) * 255 / a);
+						int g = Math.min(255, ((pixel >> 8) & 0xFF) * 255 / a);
+						int b = Math.min(255, (pixel & 0xFF) * 255 / a);
+						pixel = (a << 24) | (r << 16) | (g << 8) | b;
+					}
+					data[i] = pixel;
 				}
 
 				return data;
