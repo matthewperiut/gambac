@@ -13,8 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import com.periut.starac.Starac;
 import com.periut.starac.lwjgl3compat.util.XDGPathResolver;
-import net.fabricmc.loader.api.FabricLoader;
 import org.apache.commons.io.IOUtils;
 
 public class DesktopFileInjector {
@@ -46,15 +46,14 @@ public class DesktopFileInjector {
 		try (InputStream stream = DesktopFileInjector.class.getResourceAsStream(RESOURCE_LOCATION)) {
 			Path location = getDesktopFileLocation();
 
-			String version = FabricLoader.getInstance().getModContainer("minecraft").orElseThrow(IllegalStateException::new)
-					.getMetadata().getVersion().getFriendlyString();
 			// Use absolute path for Icon= so KDE picks it up immediately
 			String iconPath = iconDest.toAbsolutePath().toString();
 			injectFile(location, String.format(IOUtils.toString(Objects.requireNonNull(stream)),
-					version, iconPath).getBytes(StandardCharsets.UTF_8));
+					Starac.WINDOW_TITLE, iconPath).getBytes(StandardCharsets.UTF_8));
 		} catch (IOException e) {
 			LegacyLWJGL3.LOGGER.error("Failed to inject desktop file: ", e);
 		}
+		updateDesktopDatabase();
 	}
 
 	public static int setIcon(ByteBuffer[] icons) {
@@ -98,6 +97,19 @@ public class DesktopFileInjector {
 		return 0;
 	}
 
+	public static void updateTitle(String title) {
+		if (injectedLocations.isEmpty()) return;
+		Path desktopFile = getDesktopFileLocation();
+		try {
+			String content = new String(Files.readAllBytes(desktopFile), StandardCharsets.UTF_8);
+			content = content.replaceFirst("(?m)^Name=.*$", "Name=" + title);
+			Files.write(desktopFile, content.getBytes(StandardCharsets.UTF_8));
+			updateDesktopDatabase();
+		} catch (IOException e) {
+			LegacyLWJGL3.LOGGER.error("Failed to update desktop file title: ", e);
+		}
+	}
+
 	private static void injectFile(Path target, byte[] data) {
 		try {
 			Files.createDirectories(target.getParent());
@@ -118,6 +130,15 @@ public class DesktopFileInjector {
 		return XDGPathResolver.getUserDataLocation().resolve("applications").resolve(FILE_NAME);
 	}
 
+	private static void updateDesktopDatabase() {
+		Path appDir = getDesktopFileLocation().getParent();
+		ProcessBuilder builder = new ProcessBuilder("update-desktop-database", appDir.toAbsolutePath().toString());
+		try {
+			builder.start();
+		} catch (IOException ignored) {
+		}
+	}
+
 	private static void updateIconSystem() {
 		ProcessBuilder builder = new ProcessBuilder("xdg-icon-resource", "forceupdate");
 		try {
@@ -134,6 +155,7 @@ public class DesktopFileInjector {
 
 			}
 		});
+		updateDesktopDatabase();
 		updateIconSystem();
 	}
 }

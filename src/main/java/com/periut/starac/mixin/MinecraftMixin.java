@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 
 import net.minecraft.client.Minecraft;
 import org.lwjgl.BufferUtils;
+import com.periut.starac.Starac;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.Display;
 import org.spongepowered.asm.mixin.Mixin;
@@ -57,10 +58,10 @@ public abstract class MinecraftMixin {
             if (System.getProperty("org.prismlauncher.window.title") != null && System.getProperty("staracUsePrismTitle") != null) {
                 Display.setTitle(System.getProperty("org.prismlauncher.window.title"));
             } else {
-                Display.setTitle("Minecraft Beta 1.7.3");
+                Display.setTitle(Starac.WINDOW_TITLE);
             }
         } catch (Exception ignored) {
-            Display.setTitle("Minecraft Beta 1.7.3");
+            Display.setTitle(Starac.WINDOW_TITLE);
         }
 
         // Set window icon — original Minecraft used AWT Frame icons which no longer apply

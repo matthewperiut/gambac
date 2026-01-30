@@ -198,6 +198,9 @@ public final class Display {
 		if (isCreated()) {
 			GLFW.glfwSetWindowTitle(handle, title);
 		}
+		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND) {
+			DesktopFileInjector.updateTitle(title);
+		}
 	}
 
 	public static long getHandle() {
