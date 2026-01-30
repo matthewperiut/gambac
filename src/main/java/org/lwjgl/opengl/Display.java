@@ -610,4 +610,27 @@ public final class Display {
 	public static void swapBuffers() {
 		GLFW.glfwSwapBuffers(handle);
 	}
+
+	public static Drawable getDrawable() {
+		return new Drawable() {
+			@Override
+			public void makeCurrent() throws LWJGLException {
+				GLFW.glfwMakeContextCurrent(handle);
+			}
+
+			@Override
+			public void releaseContext() throws LWJGLException {
+				GLFW.glfwMakeContextCurrent(MemoryUtil.NULL);
+			}
+
+			@Override
+			public boolean isCurrent() throws LWJGLException {
+				return GLFW.glfwGetCurrentContext() == handle;
+			}
+
+			@Override
+			public void destroy() {
+			}
+		};
+	}
 }

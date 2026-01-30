@@ -3,7 +3,7 @@ package com.periut.starac.mixin;
 import com.periut.starac.BrnoMinecraft;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MinecraftApplet;
-import net.minecraft.client.Session;
+import net.minecraft.client.User;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
@@ -53,28 +53,28 @@ public class MinecraftAppletMixin extends Applet {
 
         this.minecraft = new BrnoMinecraft(this.getWidth(), this.getHeight(), fullscreen);
 
-        this.minecraft.hostAddress = this.getDocumentBase().getHost();
+        this.minecraft.host = this.getDocumentBase().getHost();
         if (this.getDocumentBase().getPort() > 0) {
             StringBuilder hostAdressBuilder = new StringBuilder();
             Minecraft mc = this.minecraft;
-            mc.hostAddress = hostAdressBuilder.append(mc.hostAddress).append(":").append(this.getDocumentBase().getPort()).toString();
+            mc.host = hostAdressBuilder.append(mc.host).append(":").append(this.getDocumentBase().getPort()).toString();
         }
 
         if (this.getParameter("username") != null && this.getParameter("sessionid") != null) {
-            this.minecraft.session = new Session(this.getParameter("username"), this.getParameter("sessionid"));
-            System.out.println("Setting user: " + this.minecraft.session.username);
+            this.minecraft.user = new User(this.getParameter("username"), this.getParameter("sessionid"));
+            System.out.println("Setting user: " + this.minecraft.user.username);
             if (this.getParameter("mppass") != null) {
-                this.minecraft.session.password = this.getParameter("mppass");
+                this.minecraft.user.mppass = this.getParameter("mppass");
             }
         } else {
-            this.minecraft.session = new Session("Player" + System.currentTimeMillis() % 10000, "");
+            this.minecraft.user = new User("Player" + System.currentTimeMillis() % 10000, "");
         }
 
         if (this.getParameter("server") != null && this.getParameter("port") != null) {
-            this.minecraft.setStartupServer(this.getParameter("server"), Integer.parseInt(this.getParameter("port")));
+            this.minecraft.connectTo(this.getParameter("server"), Integer.parseInt(this.getParameter("port")));
         }
 
-        this.startThread();
+        this.startGameThread();
 
         SwingUtilities.invokeLater(() -> {
             hideThemAll(this.getParent().getParent().getParent());
@@ -102,7 +102,7 @@ public class MinecraftAppletMixin extends Applet {
      * @reason because i don't give a shit
      */
     @Overwrite
-    public void startThread() { // startMainThread
+    public void startGameThread() { // startMainThread
         this.minecraft.run();
     }
 
@@ -111,7 +111,7 @@ public class MinecraftAppletMixin extends Applet {
         ci.cancel();
     }
 
-    @Inject(method = "stopThread", at = @At(value = "HEAD"), cancellable = true)
+    @Inject(method = "stopGameThread", at = @At(value = "HEAD"), cancellable = true)
     public void stopThread(CallbackInfo ci) {
         ci.cancel();
     }

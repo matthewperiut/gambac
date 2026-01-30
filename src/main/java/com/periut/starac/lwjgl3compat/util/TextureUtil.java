@@ -1,7 +1,7 @@
 package com.periut.starac.lwjgl3compat.util;
 
 import java.nio.IntBuffer;
-import net.minecraft.client.render.platform.MemoryTracker;
+import net.minecraft.client.MemoryTracker;
 import com.periut.starac.mixin.lwjgl3.MinecraftAccessor;
 import org.lwjgl.opengl.GL11;
 
@@ -77,7 +77,7 @@ public class TextureUtil {
 
 	private static void putInBufferAt(int[] is, int i, int j) {
 		int[] js = is;
-		if (MinecraftAccessor.getInstance().options.anaglyph) {
+		if (MinecraftAccessor.getInstance().options.anaglyph3d) {
 			js = getAnaglyphColors(is);
 		}
 

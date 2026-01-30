@@ -2,6 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.periut.starac.mixin",
+  "refmap": "starac-refmap.json",
   "plugin": "com.periut.starac.lwjgl3compat.Lwjgl3MixinPostProcessor",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
@@ -23,7 +24,10 @@
     "lwjgl3.MinecraftAccessor",
     "lwjgl3.MixinMinecraftDrawVirtualCursor",
     "lwjgl3.MixinResourceDownloadThread",
-    "lwjgl3.MixinScreenFixClipboard"
+    "lwjgl3.MixinScreenFixClipboard",
+    "stapi.MixinReloadScreenManager",
+    "stapi.ReloadScreenManagerAccessor",
+    "stapi.ReloadScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

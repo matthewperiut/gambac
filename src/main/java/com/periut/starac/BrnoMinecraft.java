@@ -1,9 +1,9 @@
 package com.periut.starac;
 
-import net.minecraft.client.CrashReportPanel;
+import net.minecraft.client.CrashInfoPanel;
+import net.minecraft.client.CrashReport;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.render.Window;
-import net.minecraft.util.crash.CrashReport;
+import net.minecraft.client.ScreenSizeCalculator;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
@@ -26,9 +26,9 @@ public class BrnoMinecraft extends Minecraft {
     }
 
     @Override
-    public void handleCrash(CrashReport throwable) { // displayUnexpectedThrowable(UnexpectedThrowable)
+    public void onCrash(CrashReport throwable) { // displayUnexpectedThrowable(UnexpectedThrowable)
         this.frame.removeAll();
-        this.frame.add(new CrashReportPanel(throwable), "Center");
+        this.frame.add(new CrashInfoPanel(throwable), "Center");
         this.frame.validate();
         this.frame.setSize(this.width, this.height);
         this.frame.setLocationRelativeTo(null);
@@ -45,7 +45,7 @@ public class BrnoMinecraft extends Minecraft {
     }
 
     @Override
-    public void init() throws LWJGLException {
+    public void init() {
         super.init();
     }
 
@@ -59,7 +59,7 @@ public class BrnoMinecraft extends Minecraft {
     }
 
     @Override
-    public void toggleFullscreen() {
+    public void toggleFullScreen() {
         try {
             this.fullscreen = !this.fullscreen;
 
@@ -108,7 +108,7 @@ public class BrnoMinecraft extends Minecraft {
         this.width = width;
         this.height = height;
         if (this.screen != null) {
-            Window scaler = new Window(this.options, width, height);
+            ScreenSizeCalculator scaler = new ScreenSizeCalculator(this.options, width, height);
             int scaledWidth = scaler.getWidth();
             int scaledHeight = scaler.getHeight();
             this.screen.init(this, scaledWidth, scaledHeight);

@@ -1,9 +1,8 @@
 package com.periut.starac.mixin.lwjgl3;
 
 import java.util.Objects;
-
+import net.minecraft.client.gui.screens.Screen;
 import com.periut.starac.lwjgl3compat.annotations.Public;
-import net.minecraft.client.gui.screen.Screen;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.Display;
 import org.spongepowered.asm.mixin.Mixin;

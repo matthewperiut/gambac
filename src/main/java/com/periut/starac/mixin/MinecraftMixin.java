@@ -23,7 +23,7 @@ import javax.imageio.ImageIO;
 public abstract class MinecraftMixin {
 
     @Shadow
-    public Canvas canvas;
+    public Canvas parent;
 
     @Shadow
     private boolean fullscreen;
@@ -37,16 +37,16 @@ public abstract class MinecraftMixin {
     @Shadow
     protected abstract void resize(int width, int height);
 
-    @Redirect(method = "<init>", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;canvas:Ljava/awt/Canvas;"))
+    @Redirect(method = "<init>", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;parent:Ljava/awt/Canvas;"))
     private void noCanvas(Minecraft instance, Canvas value) {
     }
 
-    @Inject(method = "init", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;canvas:Ljava/awt/Canvas;", ordinal = 0))
+    @Inject(method = "init", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;parent:Ljava/awt/Canvas;", ordinal = 0))
     private void setCanvasNull(CallbackInfo ci) {
-        if (canvas != null) {
-            canvas.setVisible(false);
+        if (parent != null) {
+            parent.setVisible(false);
         }
-        canvas = null;
+        parent = null;
     }
 
     // Force update screen size right after Display is created, so the Mojang
@@ -121,7 +121,7 @@ public abstract class MinecraftMixin {
     }
 
     // Resize callback in run loop
-    @Inject(method = "run", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;canvas:Ljava/awt/Canvas;", remap = false, ordinal = 1))
+    @Inject(method = "run", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;parent:Ljava/awt/Canvas;", remap = false, ordinal = 1))
     private void resizeCallback(CallbackInfo ci) {
         if ((Display.getWidth() != this.width || Display.getHeight() != this.height)) {
             this.width = Display.getWidth();
@@ -144,7 +144,7 @@ public abstract class MinecraftMixin {
     }
 
     // Cancel the license check thread that makes HTTP request to dead URL
-    @Inject(method = "initLicenseCheckThread", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "method_2104", at = @At("HEAD"), cancellable = true)
     private void killHttpRequestToDeadUrl(CallbackInfo ci) {
         ci.cancel();
     }

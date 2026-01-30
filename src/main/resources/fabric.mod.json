@@ -3,7 +3,7 @@
   "id": "starac",
   "version": "${version}",
 
-  "name": "Staráč",
+  "name": "Starac",
   "description": "Modernizes Minecraft Beta libraries for the best experience on modern OSes",
   "authors": [
     "Slainlight",
