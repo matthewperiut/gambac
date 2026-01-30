@@ -433,14 +433,16 @@ public final class Display {
 		});
 		Mouse.create();
 		Keyboard.create();
-		// Center window on primary monitor
-		long primaryMonitor = GLFW.glfwGetPrimaryMonitor();
-		if (primaryMonitor != MemoryUtil.NULL) {
-			GLFWVidMode vidMode = GLFW.glfwGetVideoMode(primaryMonitor);
-			if (vidMode != null) {
-				GLFW.glfwSetWindowPos(handle,
-						(vidMode.width() - displayMode.getWidth()) / 2,
-						(vidMode.height() - displayMode.getHeight()) / 2);
+		// Center window on primary monitor (not supported on Wayland)
+		if (GLFW.glfwGetPlatform() != GLFW.GLFW_PLATFORM_WAYLAND) {
+			long primaryMonitor = GLFW.glfwGetPrimaryMonitor();
+			if (primaryMonitor != MemoryUtil.NULL) {
+				GLFWVidMode vidMode = GLFW.glfwGetVideoMode(primaryMonitor);
+				if (vidMode != null) {
+					GLFW.glfwSetWindowPos(handle,
+							(vidMode.width() - displayMode.getWidth()) / 2,
+							(vidMode.height() - displayMode.getHeight()) / 2);
+				}
 			}
 		}
 		// Enable dark titlebar on Windows 10/11
