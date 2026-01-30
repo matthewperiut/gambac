@@ -1,8 +1,12 @@
 package com.periut.starac.mixin;
 
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 import net.minecraft.client.Minecraft;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.Display;
 import org.spongepowered.asm.mixin.Mixin;
@@ -11,6 +15,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import javax.imageio.ImageIO;
 
 @Mixin(Minecraft.class)
 public abstract class MinecraftMixin {
@@ -51,6 +57,36 @@ public abstract class MinecraftMixin {
         this.height = Display.getHeight();
         if (this.width <= 0) this.width = 1;
         if (this.height <= 0) this.height = 1;
+
+        // Set window icon — original Minecraft used AWT Frame icons which no longer apply
+        ByteBuffer[] icons = new ByteBuffer[2];
+        icons[0] = starac$loadIcon("/assets/starac/icons/16.png");
+        icons[1] = starac$loadIcon("/assets/starac/icons/32.png");
+        if (icons[0] != null && icons[1] != null) {
+            Display.setIcon(icons);
+        }
+    }
+
+    private static ByteBuffer starac$loadIcon(String path) {
+        try {
+            InputStream stream = MinecraftMixin.class.getResourceAsStream(path);
+            if (stream == null) return null;
+            BufferedImage image = ImageIO.read(stream);
+            int w = image.getWidth(), h = image.getHeight();
+            int[] pixels = new int[w * h];
+            image.getRGB(0, 0, w, h, pixels, 0, w);
+            ByteBuffer buffer = BufferUtils.createByteBuffer(w * h * 4);
+            for (int pixel : pixels) {
+                buffer.put((byte) ((pixel >> 24) & 0xFF)); // A
+                buffer.put((byte) ((pixel >> 16) & 0xFF)); // R
+                buffer.put((byte) ((pixel >> 8) & 0xFF));  // G
+                buffer.put((byte) (pixel & 0xFF));         // B
+            }
+            buffer.flip();
+            return buffer;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // Also force update at end of init for good measure

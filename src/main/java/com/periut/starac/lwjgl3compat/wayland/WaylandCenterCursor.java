@@ -37,7 +37,7 @@ public final class WaylandCenterCursor {
         try {
             Path soPath = extractNativeLibrary();
             if (soPath == null) {
-                System.out.println("[Gambac] libcenter.so not found for this platform");
+                System.out.println("[Starac] libcenter.so not found for this platform");
                 return;
             }
 
@@ -46,14 +46,14 @@ public final class WaylandCenterCursor {
             fn_finish_warp = lib.getFunctionAddress("wl_finish_warp");
 
             if (fn_setup_warp == 0 || fn_finish_warp == 0) {
-                System.out.println("[Gambac] libcenter.so missing expected symbols");
+                System.out.println("[Starac] libcenter.so missing expected symbols");
                 return;
             }
 
             available = true;
-            System.out.println("[Gambac] Wayland cursor warp available via libcenter.so");
+            System.out.println("[Starac] Wayland cursor warp available via libcenter.so");
         } catch (Exception e) {
-            System.out.println("[Gambac] Failed to initialize cursor warp: " + e.getMessage());
+            System.out.println("[Starac] Failed to initialize cursor warp: " + e.getMessage());
         }
     }
 
@@ -117,7 +117,7 @@ public final class WaylandCenterCursor {
         try (InputStream in = WaylandCenterCursor.class.getResourceAsStream(resource)) {
             if (in == null) return null;
 
-            Path tmpDir = Files.createTempDirectory("gambac-center");
+            Path tmpDir = Files.createTempDirectory("starac-center");
             Path tmpFile = tmpDir.resolve("libcenter.so");
             Files.copy(in, tmpFile, StandardCopyOption.REPLACE_EXISTING);
             tmpFile.toFile().setExecutable(true);
@@ -125,7 +125,7 @@ public final class WaylandCenterCursor {
             tmpFile.toFile().deleteOnExit();
             return tmpFile;
         } catch (Exception e) {
-            System.out.println("[Gambac] Could not extract libcenter.so: " + e.getMessage());
+            System.out.println("[Starac] Could not extract libcenter.so: " + e.getMessage());
             return null;
         }
     }

@@ -10,6 +10,7 @@ import java.util.Comparator;
 
 import com.periut.starac.lwjgl3compat.DesktopFileInjector;
 import com.periut.starac.lwjgl3compat.wayland.WaylandCenterCursor;
+import com.periut.starac.lwjgl3compat.util.OS;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.LWJGLException;
@@ -73,7 +74,7 @@ public final class Display {
 				if (output.contains("'")) {
 					String theme = output.split("'")[1];
 					nativeSetenv(setenv, "XCURSOR_THEME", theme);
-					System.out.println("[Gambac] Set XCURSOR_THEME=" + theme);
+					System.out.println("[Starac] Set XCURSOR_THEME=" + theme);
 				}
 			} catch (Exception ignored) {}
 
@@ -85,12 +86,12 @@ public final class Display {
 					p.waitFor();
 					if (!output.isEmpty()) {
 						nativeSetenv(setenv, "XCURSOR_SIZE", output);
-						System.out.println("[Gambac] Set XCURSOR_SIZE=" + output);
+						System.out.println("[Starac] Set XCURSOR_SIZE=" + output);
 					}
 				} catch (Exception ignored) {}
 			}
 		} catch (Exception e) {
-			System.out.println("[Gambac] Could not setup cursor theme: " + e.getMessage());
+			System.out.println("[Starac] Could not setup cursor theme: " + e.getMessage());
 		}
 	}
 
@@ -113,13 +114,13 @@ public final class Display {
 			org.lwjgl.system.SharedLibrary libc = org.lwjgl.system.APIUtil.apiCreateLibrary("libc.so.6");
 			long setenv = libc.getFunctionAddress("setenv");
 			if (setenv == 0) {
-				System.out.println("[Gambac] Could not find setenv in libc");
+				System.out.println("[Starac] Could not find setenv in libc");
 				return;
 			}
 
 			// Force GTK to use Wayland backend, otherwise gtk_init fails
 			nativeSetenv(setenv, "GDK_BACKEND", "wayland");
-			System.out.println("[Gambac] Set GDK_BACKEND=wayland");
+			System.out.println("[Starac] Set GDK_BACKEND=wayland");
 
 			// Extract patched libdecor-gtk plugin
 			String arch = System.getProperty("os.arch", "");
@@ -133,11 +134,11 @@ public final class Display {
 			String resource = "/" + nativeDir + "/libdecor-gtk.so";
 			try (InputStream in = Display.class.getResourceAsStream(resource)) {
 				if (in == null) {
-					System.out.println("[Gambac] Patched libdecor-gtk plugin not found for " + arch);
+					System.out.println("[Starac] Patched libdecor-gtk plugin not found for " + arch);
 					return;
 				}
 
-				Path pluginDir = Files.createTempDirectory("gambac-libdecor");
+				Path pluginDir = Files.createTempDirectory("starac-libdecor");
 				Path pluginFile = pluginDir.resolve("libdecor-gtk.so");
 				Files.copy(in, pluginFile, StandardCopyOption.REPLACE_EXISTING);
 				pluginFile.toFile().setExecutable(true);
@@ -153,10 +154,10 @@ public final class Display {
 				}
 
 				nativeSetenv(setenv, "LIBDECOR_PLUGIN_DIR", pluginDir.toAbsolutePath().toString());
-				System.out.println("[Gambac] Set LIBDECOR_PLUGIN_DIR=" + pluginDir.toAbsolutePath());
+				System.out.println("[Starac] Set LIBDECOR_PLUGIN_DIR=" + pluginDir.toAbsolutePath());
 			}
 		} catch (Exception e) {
-			System.out.println("[Gambac] Could not setup libdecor plugin: " + e.getMessage());
+			System.out.println("[Starac] Could not setup libdecor plugin: " + e.getMessage());
 		}
 	}
 
@@ -274,59 +275,78 @@ public final class Display {
 	public static int setIcon(@NotNull ByteBuffer[] icons) {
 
 		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND) {
-			// Wayland does not have a standardised way of setting window icons, see
-			// https://www.glfw.org/docs/latest/group__window.html#gadd7ccd39fe7a7d1f0904666ae5932dc5
-			// for more information.
 			return DesktopFileInjector.setIcon(icons);
 		}
 
-		// LWJGL2 doesn't enforce this to be called after window creation,
-		// meaning you have to keep hold the icons to use them when the window is created
-		if (!Arrays.equals(cached_icons, icons)) {
-			// you have to also clone the byte buffers to avoid seg faults from them being freed
+		if (!isCreated()) {
+			// Cache icons for when the window is created
 			cached_icons = Arrays.stream(icons).map(buf -> {
-				ByteBuffer copy = ByteBuffer.allocate(buf.capacity());
+				ByteBuffer copy = ByteBuffer.allocateDirect(buf.remaining());
 				int old_pos = buf.position();
 				copy.put(buf);
 				buf.position(old_pos);
 				copy.flip();
 				return copy;
 			}).toArray(ByteBuffer[]::new);
-		}
-
-		if (isCreated() && GLFW.glfwGetPlatform() != GLFW.GLFW_PLATFORM_COCOA) {
-			try (MemoryStack memoryStack = MemoryStack.stackPush()) {
-				Buffer buffer = GLFWImage.malloc(icons.length, memoryStack);
-
-				Arrays.stream(icons).forEach(buf -> {
-					GLFWImage image = GLFWImage.malloc();
-					int size = buf.limit() / 4;
-					int dimension = (int) Math.sqrt(size);
-
-					// Minecraft provides ARGB pixels; GLFW expects RGBA bytes.
-					// Convert each pixel from ARGB to RGBA byte order.
-					ByteBuffer rgba = ByteBuffer.allocateDirect(buf.limit());
-					int oldPos = buf.position();
-					for (int i = 0; i < size; i++) {
-						int offset = i * 4;
-						byte a = buf.get(offset);
-						byte r = buf.get(offset + 1);
-						byte g = buf.get(offset + 2);
-						byte b = buf.get(offset + 3);
-						rgba.put(r).put(g).put(b).put(a);
-					}
-					buf.position(oldPos);
-					rgba.flip();
-
-					buffer.put(image.set(dimension, dimension, rgba));
-				});
-
-				GLFW.glfwSetWindowIcon(handle, buffer);
-			}
-			return 1;
-		} else {
 			return 0;
 		}
+
+		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
+			// glfwSetWindowIcon is a no-op on macOS; use NSApplication API instead.
+			ByteBuffer largest = icons[0];
+			for (ByteBuffer buf : icons) {
+				if (buf.limit() > largest.limit()) largest = buf;
+			}
+			int size = largest.limit() / 4;
+			int dim = (int) Math.sqrt(size);
+			java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(dim, dim, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+			int oldPos = largest.position();
+			for (int i = 0; i < size; i++) {
+				int a = largest.get(oldPos + i * 4) & 0xFF;
+				int r = largest.get(oldPos + i * 4 + 1) & 0xFF;
+				int g = largest.get(oldPos + i * 4 + 2) & 0xFF;
+				int b = largest.get(oldPos + i * 4 + 3) & 0xFF;
+				img.setRGB(i % dim, i / dim, (a << 24) | (r << 16) | (g << 8) | b);
+			}
+			try {
+				java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+				javax.imageio.ImageIO.write(img, "png", baos);
+				MacOSDisplayHelper.setDockIcon(baos.toByteArray());
+			} catch (java.io.IOException e) {
+				System.err.println("[Display] Failed to encode icon as PNG: " + e.getMessage());
+			}
+			return 1;
+		}
+
+		// X11 / Windows: convert ARGB to RGBA and pass to GLFW
+		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
+			Buffer glfwBuffer = GLFWImage.malloc(icons.length, memoryStack);
+
+			for (ByteBuffer buf : icons) {
+				int pixelCount = buf.remaining() / 4;
+				int dimension = (int) Math.sqrt(pixelCount);
+
+				ByteBuffer rgba = MemoryUtil.memAlloc(pixelCount * 4);
+				for (int i = 0; i < pixelCount; i++) {
+					int base = buf.position() + i * 4;
+					byte a = buf.get(base);
+					byte r = buf.get(base + 1);
+					byte g = buf.get(base + 2);
+					byte b = buf.get(base + 3);
+					rgba.put(r).put(g).put(b).put(a);
+				}
+				rgba.flip();
+
+				GLFWImage image = GLFWImage.malloc(memoryStack);
+				image.set(dimension, dimension, rgba);
+				glfwBuffer.put(image);
+			}
+			glfwBuffer.flip();
+
+			System.out.println("[Starac] Setting window icon (" + icons.length + " sizes, handle=" + handle + ")");
+			GLFW.glfwSetWindowIcon(handle, glfwBuffer);
+		}
+		return 1;
 	}
 
 	public static void update() {
@@ -342,6 +362,9 @@ public final class Display {
 			MacOSDisplayHelper.relockCGLContext();
 		} else {
 			GLFW.glfwPollEvents();
+		}
+		if (OS.current() == OS.WINDOWS) {
+			WindowsDisplayHelper.pollThemeChange();
 		}
 		if (Mouse.isCreated()) {
 			Mouse.poll();
@@ -407,6 +430,20 @@ public final class Display {
 		});
 		Mouse.create();
 		Keyboard.create();
+		// Center window on primary monitor
+		long primaryMonitor = GLFW.glfwGetPrimaryMonitor();
+		if (primaryMonitor != MemoryUtil.NULL) {
+			GLFWVidMode vidMode = GLFW.glfwGetVideoMode(primaryMonitor);
+			if (vidMode != null) {
+				GLFW.glfwSetWindowPos(handle,
+						(vidMode.width() - displayMode.getWidth()) / 2,
+						(vidMode.height() - displayMode.getHeight()) / 2);
+			}
+		}
+		// Enable dark titlebar on Windows 10/11
+		if (OS.current() == OS.WINDOWS) {
+			WindowsDisplayHelper.init(handle);
+		}
 		GLFW.glfwShowWindow(handle);
 		if (cached_icons != null) {
 			setIcon(cached_icons);
@@ -419,37 +456,39 @@ public final class Display {
 		}
 	}
 
+	private static int windowedX, windowedY, windowedWidth, windowedHeight;
+
 	public static void setFullscreen(boolean fullscreen) {
-
 		try {
-			resizeCallback(handle, displayMode.getWidth(), displayMode.getHeight());
-
 			if (fullscreen) {
-				long monitor = GLFW.glfwGetWindowMonitor(handle);
-				if (monitor == 0L) {
-					monitor = GLFW.glfwGetPrimaryMonitor();
-				}
-				GLFW.glfwSetWindowMonitor(getHandle(),
-						monitor,
-						0,
-						0,
-						getWidth(),
-						getHeight(),
-						getDisplayMode().getFrequency());
-				setXPos(getDisplayMode().getWidth() / 2);
-				setYPos(getDisplayMode().getHeight() / 2);
-			} else {
-				setXPos(getXPos() - getWidth() / 2);
-				setYPos(getYPos() - getHeight() / 2);
-				GLFW.glfwSetWindowMonitor(getHandle(),
-						0L,
-						getXPos(), // need a xPos
-						getYPos(), // need a yPos
-						getWidth(),
-						getHeight(),
-						-1);
-			}
+				// Save windowed position and size for restoration
+				int[] wx = new int[1], wy = new int[1];
+				GLFW.glfwGetWindowPos(handle, wx, wy);
+				windowedX = wx[0];
+				windowedY = wy[0];
+				int[] ww = new int[1], wh = new int[1];
+				GLFW.glfwGetWindowSize(handle, ww, wh);
+				windowedWidth = ww[0];
+				windowedHeight = wh[0];
 
+				// Use the monitor's native resolution — no display mode change
+				long monitor = GLFW.glfwGetPrimaryMonitor();
+				GLFWVidMode vidMode = GLFW.glfwGetVideoMode(monitor);
+				if (vidMode != null) {
+					GLFW.glfwSetWindowMonitor(handle, monitor,
+							0, 0,
+							vidMode.width(), vidMode.height(),
+							vidMode.refreshRate());
+					resizeCallback(handle, vidMode.width(), vidMode.height());
+				}
+			} else {
+				// Restore windowed mode with saved position and size
+				GLFW.glfwSetWindowMonitor(handle, MemoryUtil.NULL,
+						windowedX, windowedY,
+						windowedWidth, windowedHeight,
+						-1);
+				resizeCallback(handle, windowedWidth, windowedHeight);
+			}
 		} catch (Throwable t) {
 			t.printStackTrace();
 		}

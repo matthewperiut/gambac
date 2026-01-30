@@ -4,18 +4,13 @@ import net.minecraft.client.CrashReportPanel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.render.Window;
 import net.minecraft.util.crash.CrashReport;
-import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.image.BufferedImage;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
 
 public class BrnoMinecraft extends Minecraft {
 
@@ -67,19 +62,7 @@ public class BrnoMinecraft extends Minecraft {
             Display.setTitle("Minecraft Beta 1.7.3");
         }
 
-        // Window Icon
-        ByteBuffer[] icons = new ByteBuffer[2];
-        try {
-            icons[0] = loadIcon("/assets/starac/icons/16.png");
-            icons[1] = loadIcon("/assets/starac/icons/32.png");
-        } catch (Exception ignored) {
-        }
-
-        if (icons[0] != null && icons[1] != null) {
-            Display.setIcon(icons);
-        }
     }
-
 
     @Override
     public void tick() {
@@ -89,37 +72,6 @@ public class BrnoMinecraft extends Minecraft {
 
         super.tick();
     }
-
-    private static ByteBuffer loadIcon(String path) {
-        try {
-            InputStream stream = BrnoMinecraft.class.getResourceAsStream(path);
-            if (stream == null) {
-                throw new RuntimeException("Icon resource not found: " + path);
-            }
-            BufferedImage image = ImageIO.read(stream);
-
-            int[] pixels = new int[image.getWidth() * image.getHeight()];
-            image.getRGB(0, 0, image.getWidth(), image.getHeight(), pixels, 0, image.getWidth());
-
-            ByteBuffer buffer = BufferUtils.createByteBuffer(image.getWidth() * image.getHeight() * 4);
-
-            for (int y = 0; y < image.getHeight(); y++) {
-                for (int x = 0; x < image.getWidth(); x++) {
-                    int pixel = pixels[y * image.getWidth() + x];
-                    buffer.put((byte) ((pixel >> 16) & 0xFF)); // Red
-                    buffer.put((byte) ((pixel >> 8) & 0xFF));  // Green
-                    buffer.put((byte) (pixel & 0xFF));         // Blue
-                    buffer.put((byte) ((pixel >> 24) & 0xFF)); // Alpha
-                }
-            }
-
-            buffer.flip();
-            return buffer;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
 
     @Override
     public void toggleFullscreen() {

@@ -43,7 +43,7 @@ public class StaracPreLaunch implements PreLaunchEntrypoint {
 		for (String path : candidates) {
 			if (new java.io.File(path).exists()) {
 				Configuration.GLFW_LIBRARY_NAME.set(path);
-				System.out.println("[Gambac] GNOME Wayland detected, using system GLFW: " + path);
+				System.out.println("[Starac] GNOME Wayland detected, using system GLFW: " + path);
 				return;
 			}
 		}
@@ -62,6 +62,6 @@ public class StaracPreLaunch implements PreLaunchEntrypoint {
 		Configuration.GLFW_CHECK_THREAD0.set(false);
 		Configuration.GLFW_LIBRARY_NAME.set("glfw_async");
 
-		System.out.println("[Gambac] macOS detected without -XstartOnFirstThread, using glfw_async");
+		System.out.println("[Starac] macOS detected without -XstartOnFirstThread, using glfw_async");
 	}
 }
