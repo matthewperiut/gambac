@@ -1,5 +1,6 @@
 package com.periut.starac.lwjgl3compat.wayland;
 
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWNativeWayland;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.system.JNI;
@@ -67,6 +68,7 @@ public final class WaylandCenterCursor {
      */
     public static void setupWarp(int x, int y) {
         if (!available) return;
+        if (GLFW.glfwGetWindowAttrib(Display.getHandle(), GLFW.GLFW_FOCUSED) == GLFW.GLFW_FALSE) return;
 
         long wlDisplay = GLFWNativeWayland.glfwGetWaylandDisplay();
         long wlSurface = GLFWNativeWayland.glfwGetWaylandWindow(Display.getHandle());
@@ -82,6 +84,12 @@ public final class WaylandCenterCursor {
      */
     public static void finishWarp() {
         if (!available || !pendingWarp) return;
+
+        if (GLFW.glfwGetWindowAttrib(Display.getHandle(), GLFW.GLFW_FOCUSED) == GLFW.GLFW_FALSE) {
+            pendingWarp = false;
+            return;
+        }
+
         pendingWarp = false;
 
         long wlDisplay = GLFWNativeWayland.glfwGetWaylandDisplay();
