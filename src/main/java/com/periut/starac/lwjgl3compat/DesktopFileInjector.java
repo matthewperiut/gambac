@@ -28,27 +28,53 @@ public class DesktopFileInjector {
 		if (Boolean.getBoolean("legacy_lwjgl3.disable_desktopfile_injection") || System.getenv("LEGACY_LWJGL3_DISABLE_DESKTOPFILE_INJECTION") != null) {
 			return;
 		}
+		if (!injectedLocations.isEmpty()) return; // already injected
 		Runtime.getRuntime().addShutdownHook(new Thread(DesktopFileInjector::uninject));
+
+		// Write the largest bundled icon first so the desktop file can reference it
+		Path iconDest = XDGPathResolver.getUserDataLocation().resolve("icons").resolve(ICON_NAME);
+		try (InputStream iconStream = DesktopFileInjector.class.getResourceAsStream("/assets/starac/icons/256.png")) {
+			if (iconStream != null) {
+				Files.createDirectories(iconDest.getParent());
+				Files.copy(iconStream, iconDest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+				injectedLocations.add(iconDest);
+			}
+		} catch (IOException e) {
+			LegacyLWJGL3.LOGGER.error("Failed to write icon: ", e);
+		}
 
 		try (InputStream stream = DesktopFileInjector.class.getResourceAsStream(RESOURCE_LOCATION)) {
 			Path location = getDesktopFileLocation();
 
 			String version = FabricLoader.getInstance().getModContainer("minecraft").orElseThrow(IllegalStateException::new)
 					.getMetadata().getVersion().getFriendlyString();
+			// Use absolute path for Icon= so KDE picks it up immediately
+			String iconPath = iconDest.toAbsolutePath().toString();
 			injectFile(location, String.format(IOUtils.toString(Objects.requireNonNull(stream)),
-					version, ICON_NAME.substring(0, ICON_NAME.lastIndexOf("."))).getBytes(StandardCharsets.UTF_8));
+					version, iconPath).getBytes(StandardCharsets.UTF_8));
 		} catch (IOException e) {
-			LegacyLWJGL3.LOGGER.error("Failed to inject icon: ", e);
+			LegacyLWJGL3.LOGGER.error("Failed to inject desktop file: ", e);
 		}
-
 	}
 
 	public static int setIcon(ByteBuffer[] icons) {
+		// Find the largest icon for the desktop file absolute path reference
+		ByteBuffer largest = icons[0];
+		for (ByteBuffer buf : icons) {
+			if (buf.remaining() > largest.remaining()) largest = buf;
+		}
+
 		for (ByteBuffer buf : icons) {
 			try {
+				int oldPos = buf.position();
 				int[] pixels = new int[buf.remaining() / 4];
 				for (int i = 0; i < pixels.length; i++) {
-					pixels[i] = Integer.rotateRight(buf.getInt(), 8);
+					int base = oldPos + i * 4;
+					int a = buf.get(base) & 0xFF;
+					int r = buf.get(base + 1) & 0xFF;
+					int g = buf.get(base + 2) & 0xFF;
+					int b = buf.get(base + 3) & 0xFF;
+					pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
 				}
 				int size = (int) Math.sqrt(pixels.length);
 				BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
@@ -58,6 +84,12 @@ public class DesktopFileInjector {
 				ImageIO.write(image, "png", outputStream);
 
 				injectFile(target, outputStream.toByteArray());
+
+				// Also write the largest icon to a fixed path for direct desktop file reference
+				if (buf == largest) {
+					Path directIcon = XDGPathResolver.getUserDataLocation().resolve("icons").resolve(ICON_NAME);
+					injectFile(directIcon, outputStream.toByteArray());
+				}
 			} catch (IOException e) {
 				return 1;
 			}
