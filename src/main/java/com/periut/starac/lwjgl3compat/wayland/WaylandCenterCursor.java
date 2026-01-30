@@ -25,6 +25,7 @@ public final class WaylandCenterCursor {
     private static SharedLibrary lib;
     private static long fn_setup_warp;
     private static long fn_finish_warp;
+    private static long fn_reset;
     private static boolean initialized;
     private static boolean available;
     private static boolean pendingWarp;
@@ -45,8 +46,9 @@ public final class WaylandCenterCursor {
             lib = org.lwjgl.system.APIUtil.apiCreateLibrary(soPath.toAbsolutePath().toString());
             fn_setup_warp = lib.getFunctionAddress("wl_setup_warp");
             fn_finish_warp = lib.getFunctionAddress("wl_finish_warp");
+            fn_reset = lib.getFunctionAddress("wl_reset");
 
-            if (fn_setup_warp == 0 || fn_finish_warp == 0) {
+            if (fn_setup_warp == 0 || fn_finish_warp == 0 || fn_reset == 0) {
                 System.out.println("[Starac] libcenter.so missing expected symbols");
                 return;
             }
@@ -84,18 +86,24 @@ public final class WaylandCenterCursor {
      */
     public static void finishWarp() {
         if (!available || !pendingWarp) return;
-
-        if (GLFW.glfwGetWindowAttrib(Display.getHandle(), GLFW.GLFW_FOCUSED) == GLFW.GLFW_FALSE) {
-            pendingWarp = false;
-            return;
-        }
-
         pendingWarp = false;
+
+        if (GLFW.glfwGetWindowAttrib(Display.getHandle(), GLFW.GLFW_FOCUSED) == GLFW.GLFW_FALSE) return;
 
         long wlDisplay = GLFWNativeWayland.glfwGetWaylandDisplay();
         if (wlDisplay == MemoryUtil.NULL) return;
 
         JNI.invokePV(wlDisplay, fn_finish_warp);
+    }
+
+    /**
+     * Reset native state. Must be called after any operation that may
+     * recreate the Wayland surface (e.g. fullscreen toggle).
+     */
+    public static void reset() {
+        if (!available) return;
+        pendingWarp = false;
+        JNI.invokeV(fn_reset);
     }
 
     public static boolean hasPendingWarp() {

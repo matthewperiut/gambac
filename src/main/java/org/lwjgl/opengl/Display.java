@@ -464,13 +464,16 @@ public final class Display {
 	private static int windowedX, windowedY, windowedWidth, windowedHeight;
 
 	public static void setFullscreen(boolean fullscreen) {
+		boolean isWayland = GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND;
 		try {
 			if (fullscreen) {
 				// Save windowed position and size for restoration
-				int[] wx = new int[1], wy = new int[1];
-				GLFW.glfwGetWindowPos(handle, wx, wy);
-				windowedX = wx[0];
-				windowedY = wy[0];
+				if (!isWayland) {
+					int[] wx = new int[1], wy = new int[1];
+					GLFW.glfwGetWindowPos(handle, wx, wy);
+					windowedX = wx[0];
+					windowedY = wy[0];
+				}
 				int[] ww = new int[1], wh = new int[1];
 				GLFW.glfwGetWindowSize(handle, ww, wh);
 				windowedWidth = ww[0];
@@ -489,10 +492,16 @@ public final class Display {
 			} else {
 				// Restore windowed mode with saved position and size
 				GLFW.glfwSetWindowMonitor(handle, MemoryUtil.NULL,
-						windowedX, windowedY,
+						isWayland ? 0 : windowedX,
+						isWayland ? 0 : windowedY,
 						windowedWidth, windowedHeight,
 						-1);
 				resizeCallback(handle, windowedWidth, windowedHeight);
+			}
+
+			// Surface may have been recreated — reset native cursor warp state
+			if (isWayland) {
+				WaylandCenterCursor.reset();
 			}
 		} catch (Throwable t) {
 			t.printStackTrace();

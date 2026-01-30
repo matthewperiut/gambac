@@ -9,7 +9,9 @@ static struct wl_pointer *lib_ptr;
 static struct zwp_pointer_constraints_v1 *lib_pcon;
 static struct wl_seat *lib_seat;
 static struct wl_event_queue *lib_queue;
+static struct wl_registry *lib_registry;
 static int lib_inited;
+static int lib_pointer_has_focus;
 
 struct warp_data {
     int x, y;
@@ -32,8 +34,12 @@ static void lib_lock_unlocked(void *d, struct zwp_locked_pointer_v1 *lk) {
 }
 static const struct zwp_locked_pointer_v1_listener lib_lock_ls = { lib_lock_locked, lib_lock_unlocked };
 
-static void lp_enter(void *d, struct wl_pointer *p, uint32_t s, struct wl_surface *sf, wl_fixed_t x, wl_fixed_t y) {}
-static void lp_leave(void *d, struct wl_pointer *p, uint32_t s, struct wl_surface *sf) {}
+static void lp_enter(void *d, struct wl_pointer *p, uint32_t s, struct wl_surface *sf, wl_fixed_t x, wl_fixed_t y) {
+    lib_pointer_has_focus = 1;
+}
+static void lp_leave(void *d, struct wl_pointer *p, uint32_t s, struct wl_surface *sf) {
+    lib_pointer_has_focus = 0;
+}
 static void lp_motion(void *d, struct wl_pointer *p, uint32_t t, wl_fixed_t x, wl_fixed_t y) {}
 static void lp_button(void *d, struct wl_pointer *p, uint32_t s, uint32_t t, uint32_t b, uint32_t st) {}
 static void lp_axis(void *d, struct wl_pointer *p, uint32_t t, uint32_t a, wl_fixed_t v) {}
@@ -65,9 +71,9 @@ static const struct wl_registry_listener lib_reg_ls = { lib_reg_global, lib_reg_
 static void lib_init(struct wl_display *dpy) {
     if (lib_inited) return;
     lib_queue = wl_display_create_queue(dpy);
-    struct wl_registry *reg = wl_display_get_registry(dpy);
-    wl_proxy_set_queue((struct wl_proxy *)reg, lib_queue);
-    wl_registry_add_listener(reg, &lib_reg_ls, NULL);
+    lib_registry = wl_display_get_registry(dpy);
+    wl_proxy_set_queue((struct wl_proxy *)lib_registry, lib_queue);
+    wl_registry_add_listener(lib_registry, &lib_reg_ls, NULL);
     wl_display_roundtrip_queue(dpy, lib_queue);
     wl_display_roundtrip_queue(dpy, lib_queue);
     lib_inited = 1;
@@ -79,6 +85,12 @@ __attribute__((visibility("default")))
 void wl_setup_warp(void *wl_display, void *wl_surface, int x, int y) {
     struct wl_display *dpy = wl_display;
     lib_init(dpy);
+
+    /* Dispatch any pending enter/leave events before checking focus. */
+    wl_display_roundtrip_queue(dpy, lib_queue);
+
+    if (!lib_pointer_has_focus) return;
+
     wd.x = x;
     wd.y = y;
     wd.surf = wl_surface;
@@ -90,8 +102,13 @@ void wl_finish_warp(void *wl_display) {
     struct wl_display *dpy = wl_display;
     if (!lib_queue || !lib_pcon || !lib_ptr || !wd.surf) return;
 
-    /* Ensure our pointer has focus on the surface. */
+    /* Dispatch to get latest focus state. */
     wl_display_roundtrip_queue(dpy, lib_queue);
+
+    if (!lib_pointer_has_focus) {
+        wd.surf = NULL;
+        return;
+    }
 
     wd.done = 0;
 
@@ -113,4 +130,14 @@ void wl_finish_warp(void *wl_display) {
 
     /* Final roundtrip to let compositor process the unlock. */
     wl_display_roundtrip_queue(dpy, lib_queue);
+    wd.surf = NULL;
+}
+
+__attribute__((visibility("default")))
+void wl_reset(void) {
+    /* Clear cached pointer focus state so the next warp
+       re-evaluates enter/leave from scratch. */
+    lib_pointer_has_focus = 0;
+    wd.surf = NULL;
+    wd.done = 0;
 }
