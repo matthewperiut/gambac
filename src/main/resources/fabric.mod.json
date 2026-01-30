@@ -10,7 +10,7 @@
     "DanyGames2014"
   ],
 
-  "license": "MIT",
+  "license": ["MIT", "LGPL-2.1-only"],
   "icon": "assets/starac/icon.png",
 
   "environment": "*",
