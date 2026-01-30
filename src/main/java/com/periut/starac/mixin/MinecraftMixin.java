@@ -52,19 +52,32 @@ public abstract class MinecraftMixin {
     // loading screen renders at the correct scale on HiDPI/Retina displays
     @Inject(method = "init", at = @At(value = "INVOKE", target = "Lorg/lwjgl/opengl/Display;create()V", shift = At.Shift.AFTER, remap = false))
     private void forceUpdateScreenSizeEarly(CallbackInfo ci) {
+        // Set window title immediately — before any events are polled
+        try {
+            if (System.getProperty("org.prismlauncher.window.title") != null && System.getProperty("staracUsePrismTitle") != null) {
+                Display.setTitle(System.getProperty("org.prismlauncher.window.title"));
+            } else {
+                Display.setTitle("Minecraft Beta 1.7.3");
+            }
+        } catch (Exception ignored) {
+            Display.setTitle("Minecraft Beta 1.7.3");
+        }
+
+        // Set window icon — original Minecraft used AWT Frame icons which no longer apply
+        ByteBuffer[] icons = new ByteBuffer[4];
+        icons[0] = starac$loadIcon("/assets/starac/icons/16.png");
+        icons[1] = starac$loadIcon("/assets/starac/icons/32.png");
+        icons[2] = starac$loadIcon("/assets/starac/icons/64.png");
+        icons[3] = starac$loadIcon("/assets/starac/icons/256.png");
+        if (icons[0] != null && icons[1] != null && icons[2] != null && icons[3] != null) {
+            Display.setIcon(icons);
+        }
+
         GLFW.glfwPollEvents();
         this.width = Display.getWidth();
         this.height = Display.getHeight();
         if (this.width <= 0) this.width = 1;
         if (this.height <= 0) this.height = 1;
-
-        // Set window icon — original Minecraft used AWT Frame icons which no longer apply
-        ByteBuffer[] icons = new ByteBuffer[2];
-        icons[0] = starac$loadIcon("/assets/starac/icons/16.png");
-        icons[1] = starac$loadIcon("/assets/starac/icons/32.png");
-        if (icons[0] != null && icons[1] != null) {
-            Display.setIcon(icons);
-        }
     }
 
     private static ByteBuffer starac$loadIcon(String path) {

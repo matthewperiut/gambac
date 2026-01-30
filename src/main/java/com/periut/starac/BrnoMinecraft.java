@@ -47,21 +47,6 @@ public class BrnoMinecraft extends Minecraft {
     @Override
     public void init() throws LWJGLException {
         super.init();
-
-        // Window Title
-        try {
-            if (System.getProperty("org.prismlauncher.window.title") != null && System.getProperty("staracUsePrismTitle") != null) {
-                // PrismLauncher Window Title
-                Display.setTitle(System.getProperty("org.prismlauncher.window.title"));
-            } else {
-                // Fallback
-                Display.setTitle("Minecraft Beta 1.7.3");
-            }
-        } catch (Exception ignored) {
-            // If something happens, fallback to the default title
-            Display.setTitle("Minecraft Beta 1.7.3");
-        }
-
     }
 
     @Override

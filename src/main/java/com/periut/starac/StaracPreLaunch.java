@@ -13,6 +13,7 @@ public class StaracPreLaunch implements PreLaunchEntrypoint {
 		} else if (os.contains("mac")) {
 			setupMacOS();
 		}
+
 	}
 
 	private void setupLinux() {
