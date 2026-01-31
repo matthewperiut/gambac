@@ -31,15 +31,33 @@ public class StaracPreLaunch implements PreLaunchEntrypoint {
 		}
 
 		String arch = System.getProperty("os.arch", "");
-		String libDir = arch.contains("aarch64") ? "/usr/lib/aarch64-linux-gnu" : "/usr/lib";
 
-		// Try common system GLFW paths
-		String[] candidates = {
-			libDir + "/libglfw.so.3",
-			libDir + "/libglfw.so",
-			"/usr/lib64/libglfw.so.3",
-			"/usr/lib64/libglfw.so",
-		};
+		// Try common system GLFW paths, preferring arch-appropriate directories
+		String[] candidates;
+		if (arch.contains("aarch64")) {
+			candidates = new String[]{
+				"/usr/lib/aarch64-linux-gnu/libglfw.so.3",
+				"/usr/lib/aarch64-linux-gnu/libglfw.so",
+				"/usr/lib64/libglfw.so.3",
+				"/usr/lib64/libglfw.so",
+				"/usr/lib/libglfw.so.3",
+				"/usr/lib/libglfw.so",
+			};
+		} else if (arch.contains("64")) {
+			candidates = new String[]{
+				"/usr/lib/x86_64-linux-gnu/libglfw.so.3",
+				"/usr/lib/x86_64-linux-gnu/libglfw.so",
+				"/usr/lib64/libglfw.so.3",
+				"/usr/lib64/libglfw.so",
+				"/usr/lib/libglfw.so.3",
+				"/usr/lib/libglfw.so",
+			};
+		} else {
+			candidates = new String[]{
+				"/usr/lib/libglfw.so.3",
+				"/usr/lib/libglfw.so",
+			};
+		}
 
 		for (String path : candidates) {
 			if (new java.io.File(path).exists()) {
