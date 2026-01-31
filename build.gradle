@@ -123,7 +123,7 @@ java {
 }
 
 tasks.withType(Jar).configureEach {
-    from("LICENSE", "LCIENSE.LGPL") {
+    from("LICENSE") {
         rename { "${it}_${project.archives_base_name}"}
     }
 }
