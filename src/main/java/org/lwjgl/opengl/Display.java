@@ -40,13 +40,22 @@ public final class Display {
 	private static boolean focused;
 	private static boolean glfwInitialized = false;
 	private static boolean usingGlfwAsync = false;
+	private static boolean cinnamonSizeLimitActive = false;
 
 	private Display() {
 	}
 
-	private static boolean isGnome() {
+	private static boolean needsLibdecor() {
 		String desktop = System.getenv("XDG_CURRENT_DESKTOP");
-		return desktop != null && desktop.toUpperCase().contains("GNOME");
+		if (desktop == null) return false;
+		String upper = desktop.toUpperCase();
+		return upper.contains("GNOME") || upper.contains("CINNAMON");
+	}
+
+	private static boolean isCinnamonWayland() {
+		String desktop = System.getenv("XDG_CURRENT_DESKTOP");
+		return desktop != null && desktop.toUpperCase().contains("CINNAMON")
+				&& GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND;
 	}
 
 	/**
@@ -166,12 +175,11 @@ public final class Display {
 		glfwInitialized = true;
 		usingGlfwAsync = "glfw_async".equals(org.lwjgl.system.Configuration.GLFW_LIBRARY_NAME.get());
 		GLFWErrorCallback.createPrint(System.err).set();
-		if (GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
+		if (System.getenv("WAYLAND_DISPLAY") != null && GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
 			setupCursorTheme();
-			// GNOME is the only major compositor lacking xdg-decoration (server-side
-			// decorations), so it needs a patched libdecor-gtk plugin. Other compositors
-			// (KDE, Sway, etc.) handle decorations natively.
-			if (isGnome()) {
+			// Compositors without xdg-decoration (e.g. GNOME, Cinnamon) need
+			// a patched libdecor-gtk plugin for window decorations.
+			if (needsLibdecor()) {
 				setupLibdecorPlugin();
 			}
 			GLFW.glfwInitHint(GLFW.GLFW_PLATFORM, GLFW.GLFW_PLATFORM_WAYLAND);
@@ -420,6 +428,13 @@ public final class Display {
 				GLFW.glfwCreateWindow(displayMode.getWidth(), displayMode.getHeight(), title, MemoryUtil.NULL, MemoryUtil.NULL);
 		width = displayMode.getWidth();
 		height = displayMode.getHeight();
+		// Cinnamon's Muffin attaches libdecor decorations late, sending a
+		// configure that shrinks the window. Lock the minimum size until
+		// the first resize callback fires.
+		if (isCinnamonWayland()) {
+			GLFW.glfwSetWindowSizeLimits(handle, displayMode.getWidth(), displayMode.getHeight(), GLFW.GLFW_DONT_CARE, GLFW.GLFW_DONT_CARE);
+			cinnamonSizeLimitActive = true;
+		}
 		GLFW.glfwMakeContextCurrent(handle);
 		GL.createCapabilities();
 		GLFW.glfwSwapInterval(0); // disable vsync by default
@@ -601,6 +616,10 @@ public final class Display {
 
 	private static void resizeCallback(long window, int width, int height) {
 		if (window == handle) {
+			if (cinnamonSizeLimitActive) {
+				cinnamonSizeLimitActive = false;
+				GLFW.glfwSetWindowSizeLimits(handle, GLFW.GLFW_DONT_CARE, GLFW.GLFW_DONT_CARE, GLFW.GLFW_DONT_CARE, GLFW.GLFW_DONT_CARE);
+			}
 			window_resized = true;
 			Display.width = width;
 			Display.height = height;
