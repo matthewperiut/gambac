@@ -155,8 +155,21 @@ public final class Display {
 				pluginFile.toFile().deleteOnExit();
 
 				// Copy the system cairo plugin as fallback (e.g. if GTK3 is not installed)
-				Path systemCairo = Path.of("/usr/lib/libdecor/plugins-1/libdecor-cairo.so");
-				if (Files.exists(systemCairo)) {
+				// Try arch-appropriate lib dir first (lib64 on Fedora/RHEL, then lib)
+				String[] cairoCandidates = {
+					"/usr/lib64/libdecor/plugins-1/libdecor-cairo.so",
+					"/usr/lib/x86_64-linux-gnu/libdecor/plugins-1/libdecor-cairo.so",
+					"/usr/lib/libdecor/plugins-1/libdecor-cairo.so",
+				};
+				Path systemCairo = null;
+				for (String c : cairoCandidates) {
+					Path p = Path.of(c);
+					if (Files.exists(p)) {
+						systemCairo = p;
+						break;
+					}
+				}
+				if (systemCairo != null) {
 					Path cairoCopy = pluginDir.resolve("libdecor-cairo.so");
 					Files.copy(systemCairo, cairoCopy, StandardCopyOption.REPLACE_EXISTING);
 					cairoCopy.toFile().deleteOnExit();
