@@ -15,27 +15,45 @@ static struct wl_registry *lib_registry;
 static int lib_inited;
 static int lib_pointer_has_focus;
 static uint32_t lib_enter_serial;
+static int lib_is_gnome;
 
 struct warp_data {
     int x, y;
     struct wl_surface *surf;
+    int done;
 };
 
 static struct warp_data wd;
 
-/* ── Locked pointer listener (fallback for compositors without pointer-warp) ── */
+/* ── Locked pointer listener (KDE mode) ── */
 static int lib_locked;
-static void lib_lock_locked(void *d, struct zwp_locked_pointer_v1 *lk) {
+static void lib_lock_locked_kde(void *d, struct zwp_locked_pointer_v1 *lk) {
     zwp_locked_pointer_v1_set_cursor_position_hint(lk,
         wl_fixed_from_int(wd.x), wl_fixed_from_int(wd.y));
     wl_surface_commit(wd.surf);
     lib_locked = 1;
 }
-static void lib_lock_unlocked(void *d, struct zwp_locked_pointer_v1 *lk) {
+static void lib_lock_unlocked_kde(void *d, struct zwp_locked_pointer_v1 *lk) {
     (void)d; (void)lk;
 }
-static const struct zwp_locked_pointer_v1_listener lib_lock_ls = {
-    lib_lock_locked, lib_lock_unlocked
+static const struct zwp_locked_pointer_v1_listener lib_lock_ls_kde = {
+    lib_lock_locked_kde, lib_lock_unlocked_kde
+};
+
+/* ── Locked pointer listener (GNOME mode) ── */
+static void lib_lock_locked_gnome(void *d, struct zwp_locked_pointer_v1 *lk) {
+    zwp_locked_pointer_v1_set_cursor_position_hint(lk,
+        wl_fixed_from_int(wd.x), wl_fixed_from_int(wd.y));
+    wl_surface_commit(wd.surf);
+    zwp_locked_pointer_v1_destroy(lk);
+    wl_surface_commit(wd.surf);
+    wd.done = 1;
+}
+static void lib_lock_unlocked_gnome(void *d, struct zwp_locked_pointer_v1 *lk) {
+    (void)d; (void)lk;
+}
+static const struct zwp_locked_pointer_v1_listener lib_lock_ls_gnome = {
+    lib_lock_locked_gnome, lib_lock_unlocked_gnome
 };
 
 /* ── Pointer listener (focus + enter serial tracking) ── */
@@ -101,7 +119,7 @@ static int do_pointer_warp(struct wl_display *dpy) {
     return 1;
 }
 
-static int do_lock_warp(struct wl_display *dpy) {
+static int do_lock_warp_kde(struct wl_display *dpy) {
     if (!lib_pcon) return 0;
     lib_locked = 0;
 
@@ -115,7 +133,7 @@ static int do_lock_warp(struct wl_display *dpy) {
     wl_surface_commit(wd.surf);
 
     wl_proxy_set_queue((struct wl_proxy *)lk, lib_queue);
-    zwp_locked_pointer_v1_add_listener(lk, &lib_lock_ls, &wd);
+    zwp_locked_pointer_v1_add_listener(lk, &lib_lock_ls_kde, NULL);
 
     int tries = 0;
     while (!lib_locked && tries < 5) {
@@ -136,7 +154,37 @@ static int do_lock_warp(struct wl_display *dpy) {
     return 1;
 }
 
+static int do_lock_warp_gnome(struct wl_display *dpy) {
+    if (!lib_pcon) return 0;
+    wd.done = 0;
+
+    struct zwp_locked_pointer_v1 *lk = zwp_pointer_constraints_v1_lock_pointer(
+        lib_pcon, wd.surf, lib_ptr, NULL,
+        ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_ONESHOT);
+    if (!lk) return 0;
+
+    wl_proxy_set_queue((struct wl_proxy *)lk, lib_queue);
+    zwp_locked_pointer_v1_add_listener(lk, &lib_lock_ls_gnome, &wd);
+
+    int tries = 0;
+    while (!wd.done && tries < 5) {
+        wl_display_roundtrip_queue(dpy, lib_queue);
+        tries++;
+    }
+    if (!wd.done) {
+        zwp_locked_pointer_v1_destroy(lk);
+    }
+
+    wl_display_roundtrip_queue(dpy, lib_queue);
+    return 1;
+}
+
 /* ── Library entry points ── */
+
+__attribute__((visibility("default")))
+void wl_set_gnome(int is_gnome) {
+    lib_is_gnome = is_gnome;
+}
 
 __attribute__((visibility("default")))
 void wl_setup_warp(void *wl_display, void *wl_surface, int x, int y) {
@@ -149,6 +197,7 @@ void wl_setup_warp(void *wl_display, void *wl_surface, int x, int y) {
     wd.x = x;
     wd.y = y;
     wd.surf = wl_surface;
+    wd.done = 0;
 }
 
 __attribute__((visibility("default")))
@@ -162,8 +211,13 @@ void wl_finish_warp(void *wl_display) {
         return;
     }
 
-    if (!do_pointer_warp(dpy))
-        do_lock_warp(dpy);
+    if (lib_is_gnome) {
+        do_lock_warp_gnome(dpy);
+    } else {
+        if (!do_pointer_warp(dpy)) {
+            do_lock_warp_kde(dpy);
+        }
+    }
 
     wd.surf = NULL;
 }
@@ -172,4 +226,5 @@ __attribute__((visibility("default")))
 void wl_reset(void) {
     lib_pointer_has_focus = 0;
     wd.surf = NULL;
+    wd.done = 0;
 }

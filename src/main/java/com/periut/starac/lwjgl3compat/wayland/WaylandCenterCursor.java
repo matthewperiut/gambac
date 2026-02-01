@@ -26,11 +26,19 @@ public final class WaylandCenterCursor {
     private static long fn_setup_warp;
     private static long fn_finish_warp;
     private static long fn_reset;
+    private static long fn_set_gnome;
     private static boolean initialized;
     private static boolean available;
     private static boolean pendingWarp;
 
     private WaylandCenterCursor() {}
+
+    private static boolean isGnomeDesktop() {
+        String desktop = System.getenv("XDG_CURRENT_DESKTOP");
+        if (desktop == null) return false;
+        String upper = desktop.toUpperCase();
+        return upper.contains("GNOME") || upper.contains("CINNAMON");
+    }
 
     public static void init() {
         if (initialized) return;
@@ -47,14 +55,19 @@ public final class WaylandCenterCursor {
             fn_setup_warp = lib.getFunctionAddress("wl_setup_warp");
             fn_finish_warp = lib.getFunctionAddress("wl_finish_warp");
             fn_reset = lib.getFunctionAddress("wl_reset");
+            fn_set_gnome = lib.getFunctionAddress("wl_set_gnome");
 
-            if (fn_setup_warp == 0 || fn_finish_warp == 0 || fn_reset == 0) {
+            if (fn_setup_warp == 0 || fn_finish_warp == 0 || fn_reset == 0 || fn_set_gnome == 0) {
                 System.out.println("[Starac] libcenter.so missing expected symbols");
                 return;
             }
 
+            // Detect GNOME and notify native library
+            boolean isGnome = isGnomeDesktop();
+            JNI.invokeI(isGnome ? 1 : 0, fn_set_gnome);
+
             available = true;
-            System.out.println("[Starac] Wayland cursor warp available via libcenter.so");
+            System.out.println("[Starac] Wayland cursor warp available via libcenter.so (GNOME=" + isGnome + ")");
         } catch (Exception e) {
             System.out.println("[Starac] Failed to initialize cursor warp: " + e.getMessage());
         }
