@@ -189,6 +189,29 @@ public final class Display {
 		glfwInitialized = true;
 		usingGlfwAsync = "glfw_async".equals(org.lwjgl.system.Configuration.GLFW_LIBRARY_NAME.get());
 		GLFWErrorCallback.createPrint(System.err).set();
+		// Fix X11 text input: Java never calls setlocale(), leaving the C
+		// locale as "C", which causes GLFW's XIM to silently fail and the
+		// char callback to never fire. We also disable input method daemons
+		// (IBus, Fcitx, etc.) via XMODIFIERS because they process key events
+		// asynchronously, causing the char callback to fire on a later frame
+		// than the key callback — breaking the event merge logic.
+		if (OS.current() == OS.LINUX && System.getenv("WAYLAND_DISPLAY") == null) {
+			try {
+				org.lwjgl.system.SharedLibrary libc = org.lwjgl.system.APIUtil.apiCreateLibrary("libc.so.6");
+				long setlocale = libc.getFunctionAddress("setlocale");
+				if (setlocale != 0) {
+					ByteBuffer empty = MemoryUtil.memASCII("", true);
+					org.lwjgl.system.JNI.invokePP(0 /* LC_ALL */, MemoryUtil.memAddress(empty), setlocale);
+					MemoryUtil.memFree(empty);
+				}
+				long setenv = libc.getFunctionAddress("setenv");
+				if (setenv != 0) {
+					nativeSetenv(setenv, "XMODIFIERS", "@im=none");
+				}
+			} catch (Exception e) {
+				System.out.println("[Starac] Could not setup X11 locale: " + e.getMessage());
+			}
+		}
 
 		if (!forceX11Fallback && System.getenv("WAYLAND_DISPLAY") != null && GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
 			setupCursorTheme();
