@@ -41,6 +41,7 @@ public final class Display {
 	private static boolean glfwInitialized = false;
 	private static boolean usingGlfwAsync = false;
 	private static boolean cinnamonSizeLimitActive = false;
+	private static boolean forceX11Fallback = false;
 
 	private Display() {
 	}
@@ -188,7 +189,8 @@ public final class Display {
 		glfwInitialized = true;
 		usingGlfwAsync = "glfw_async".equals(org.lwjgl.system.Configuration.GLFW_LIBRARY_NAME.get());
 		GLFWErrorCallback.createPrint(System.err).set();
-		if (System.getenv("WAYLAND_DISPLAY") != null && GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
+
+		if (!forceX11Fallback && System.getenv("WAYLAND_DISPLAY") != null && GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
 			setupCursorTheme();
 			// Compositors without xdg-decoration (e.g. GNOME, Cinnamon) need
 			// a patched libdecor-gtk plugin for window decorations.
@@ -197,8 +199,18 @@ public final class Display {
 			}
 			GLFW.glfwInitHint(GLFW.GLFW_PLATFORM, GLFW.GLFW_PLATFORM_WAYLAND);
 			GLFW.glfwInitHint(GLFW.GLFW_WAYLAND_LIBDECOR, GLFW.GLFW_WAYLAND_PREFER_LIBDECOR);
+		} else if (forceX11Fallback) {
+			GLFW.glfwInitHint(GLFW.GLFW_PLATFORM, GLFW.GLFW_PLATFORM_X11);
 		}
+
 		if (!GLFW.glfwInit()) {
+			if (!forceX11Fallback && System.getenv("WAYLAND_DISPLAY") != null) {
+				System.out.println("[Starac] Wayland GLFW init failed, falling back to X11/XWayland");
+				forceX11Fallback = true;
+				glfwInitialized = false;
+				ensureInitialized();
+				return;
+			}
 			throw new IllegalStateException("Unable to initialize GLFW");
 		}
 		if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND) {
@@ -439,6 +451,18 @@ public final class Display {
 		GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, 1);
 		handle =
 				GLFW.glfwCreateWindow(displayMode.getWidth(), displayMode.getHeight(), title, MemoryUtil.NULL, MemoryUtil.NULL);
+		if (handle == MemoryUtil.NULL && !forceX11Fallback && GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND) {
+			System.out.println("[Starac] Wayland window creation failed, falling back to X11/XWayland");
+			GLFW.glfwTerminate();
+			forceX11Fallback = true;
+			glfwInitialized = false;
+			ensureInitialized();
+			create(pixelFormat);
+			return;
+		}
+		if (handle == MemoryUtil.NULL) {
+			throw new LWJGLException("Failed to create GLFW window");
+		}
 		width = displayMode.getWidth();
 		height = displayMode.getHeight();
 		// Cinnamon's Muffin attaches libdecor decorations late, sending a
