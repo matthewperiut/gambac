@@ -29,10 +29,10 @@ public abstract class MinecraftMixin {
     private boolean fullscreen;
 
     @Shadow
-    public int width;
+    public int displayWidth;
 
     @Shadow
-    public int height;
+    public int displayHeight;
 
     @Shadow
     protected abstract void resize(int width, int height);
@@ -75,10 +75,10 @@ public abstract class MinecraftMixin {
         }
 
         GLFW.glfwPollEvents();
-        this.width = Display.getWidth();
-        this.height = Display.getHeight();
-        if (this.width <= 0) this.width = 1;
-        if (this.height <= 0) this.height = 1;
+        this.displayWidth = Display.getWidth();
+        this.displayHeight = Display.getHeight();
+        if (this.displayWidth <= 0) this.displayWidth = 1;
+        if (this.displayHeight <= 0) this.displayHeight = 1;
     }
 
     private static ByteBuffer starac$loadIcon(String path) {
@@ -107,33 +107,33 @@ public abstract class MinecraftMixin {
     @Inject(method = "init", at = @At("TAIL"))
     private void forceUpdateScreenSize(CallbackInfo ci) {
         GLFW.glfwPollEvents();
-        this.width = Display.getWidth();
-        this.height = Display.getHeight();
-        if (this.width <= 0) {
-            this.width = 1;
+        this.displayWidth = Display.getWidth();
+        this.displayHeight = Display.getHeight();
+        if (this.displayWidth <= 0) {
+            this.displayWidth = 1;
         }
 
-        if (this.height <= 0) {
-            this.height = 1;
+        if (this.displayHeight <= 0) {
+            this.displayHeight = 1;
         }
 
-        this.resize(this.width, this.height);
+        this.resize(this.displayWidth, this.displayHeight);
     }
 
     // Resize callback in run loop
     @Inject(method = "run", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;canvas:Ljava/awt/Canvas;", remap = false, ordinal = 1))
     private void resizeCallback(CallbackInfo ci) {
-        if ((Display.getWidth() != this.width || Display.getHeight() != this.height)) {
-            this.width = Display.getWidth();
-            this.height = Display.getHeight();
-            if (this.width <= 0) {
-                this.width = 1;
+        if ((Display.getWidth() != this.displayWidth || Display.getHeight() != this.displayHeight)) {
+            this.displayWidth = Display.getWidth();
+            this.displayHeight = Display.getHeight();
+            if (this.displayWidth <= 0) {
+                this.displayWidth = 1;
             }
 
-            if (this.height <= 0) {
-                this.height = 1;
+            if (this.displayHeight <= 0) {
+                this.displayHeight = 1;
             }
-            this.resize(this.width, this.height);
+            this.resize(this.displayWidth, this.displayHeight);
         }
     }
 
@@ -144,7 +144,7 @@ public abstract class MinecraftMixin {
     }
 
     // Cancel the license check thread that makes HTTP request to dead URL
-    @Inject(method = "initLicenseCheckThread", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "startSessionCheck", at = @At("HEAD"), cancellable = true)
     private void killHttpRequestToDeadUrl(CallbackInfo ci) {
         ci.cancel();
     }
