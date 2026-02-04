@@ -1,4 +1,5 @@
 plugins {
+    id 'java-library'
     id 'maven-publish'
     id 'net.fabricmc.fabric-loom-remap' version '1.15.+'
     id 'ploceus' version '1.15-SNAPSHOT'
@@ -56,7 +57,7 @@ dependencies {
 
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    api platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
     include platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
 
     ['linux', 'windows', 'macos', 'windows-arm64', 'macos-arm64', 'linux-arm64'].each { platform ->
@@ -66,10 +67,10 @@ dependencies {
         include runtimeOnly("org.lwjgl:lwjgl-opengl::natives-${platform}")
     }
 
-    include implementation("org.lwjgl:lwjgl:${lwjglVersion}")
-    include implementation("org.lwjgl:lwjgl-glfw:${lwjglVersion}")
-    include implementation("org.lwjgl:lwjgl-openal:${lwjglVersion}")
-    include implementation("org.lwjgl:lwjgl-opengl:${lwjglVersion}")
+    include api("org.lwjgl:lwjgl:${lwjglVersion}")
+    include api("org.lwjgl:lwjgl-glfw:${lwjglVersion}")
+    include api("org.lwjgl:lwjgl-openal:${lwjglVersion}")
+    include api("org.lwjgl:lwjgl-opengl:${lwjglVersion}")
 
 //    modImplementation("net.modificationstation:StationAPI:${project.stationapi_version}")
 }
