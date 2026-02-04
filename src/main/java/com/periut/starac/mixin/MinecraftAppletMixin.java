@@ -77,10 +77,14 @@ public class MinecraftAppletMixin extends Applet {
         this.startThread();
 
         SwingUtilities.invokeLater(() -> {
-            hideThemAll(this.getParent().getParent().getParent());
-            hideThemAll(this.getParent().getParent());
-            hideThemAll(this.getParent());
-            hideThemAll(this);
+            try {
+                hideThemAll(this.getParent().getParent().getParent());
+                hideThemAll(this.getParent().getParent());
+                hideThemAll(this.getParent());
+                hideThemAll(this);
+            } catch (Exception ignored) {
+                // Ignore AWT/GLFW interaction errors
+            }
         });
     }
 
@@ -93,7 +97,8 @@ public class MinecraftAppletMixin extends Applet {
             for (Component component : container.getComponents()) {
                 component.setVisible(false);
             }
-        } catch (NullPointerException ignored) {
+        } catch (Exception ignored) {
+            // Ignore any AWT/GLFW interaction errors
         }
     }
 

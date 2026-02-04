@@ -602,13 +602,18 @@ public final class Display {
 	}
 
 	public static void destroy() {
+		if (handle == -1L) {
+			return; // Not created, nothing to destroy
+		}
 		if (usingGlfwAsync && GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
 			MacOSDisplayHelper.unlockCGLContext();
 		}
 		WaylandCenterCursor.destroy();
-		// free callbacks
-		assert sizeCallback != null;
-		sizeCallback.free();
+		// free callbacks (with null checks)
+		if (sizeCallback != null) {
+			sizeCallback.free();
+			sizeCallback = null;
+		}
 		Mouse.destroy();
 		Keyboard.destroy();
 		GLFWErrorCallback callback = GLFW.glfwSetErrorCallback(null);
@@ -618,6 +623,7 @@ public final class Display {
 		// Destroy the window
 		GLFW.glfwDestroyWindow(handle);
 		GLFW.glfwTerminate();
+		handle = -1L;
 	}
 
 	public static boolean isCreated() {
