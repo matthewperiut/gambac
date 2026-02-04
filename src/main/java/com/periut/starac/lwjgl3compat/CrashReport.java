@@ -9,10 +9,10 @@ import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 
 public class CrashReport {
-	public static void report(net.minecraft.client.CrashReport summary){
+	public static void report(net.minecraft.util.crash.CrashReport summary){
 		Display.destroy();
 		StringWriter var2 = new StringWriter();
-		summary.e.printStackTrace(new PrintWriter(var2));
+		summary.exception.printStackTrace(new PrintWriter(var2));
 		String stackTrace = var2.toString();
 		String cardManufacturer = "";
 		StringBuilder report = new StringBuilder();

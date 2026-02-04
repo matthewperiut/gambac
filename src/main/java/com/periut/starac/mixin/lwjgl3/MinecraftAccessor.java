@@ -6,7 +6,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(Minecraft.class)
 public interface MinecraftAccessor {
-	@Accessor("instance")
+	@Accessor("INSTANCE")
 	static Minecraft getInstance(){
 		throw new IllegalStateException();
 	}

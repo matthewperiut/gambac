@@ -21,11 +21,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import net.minecraft.client.ScreenSizeCalculator;
-import net.minecraft.client.gui.screens.ChatScreen;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.renderer.Tesselator;
+import net.minecraft.client.gui.screen.ChatScreen;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.ingame.HandledScreen;
+import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.util.ScreenScaler;
 import org.apache.commons.io.IOUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -172,15 +172,15 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 	}
 
 	private boolean mayVirtualize() {
-		return MinecraftAccessor.getInstance().level != null;
+		return MinecraftAccessor.getInstance().world != null;
 	}
 
 	/*
 	 * whether we are on a screen where the virtual cursor is allowed
 	 */
 	private boolean isValidScreen() {
-		Screen s = MinecraftAccessor.getInstance().screen;
-		return s instanceof AbstractContainerScreen || s instanceof ChatScreen;
+		Screen s = MinecraftAccessor.getInstance().currentScreen;
+		return s instanceof HandledScreen || s instanceof ChatScreen;
 	}
 
 	private void setup() {
@@ -305,7 +305,7 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 			GlStateManager.bindTexture(images[current]);
 
 			var mc = MinecraftAccessor.getInstance();
-			float scale = new ScreenSizeCalculator(mc.options, mc.width, mc.height).guiScale;
+			float scale = new ScreenScaler(mc.options, mc.displayWidth, mc.displayHeight).scaleFactor;
 			double x = getX();
 			double y = getY();
 			drawTexture((x - getCurrent().xhot) / scale, (Display.getHeight() - y - getCurrent().yhot) / scale, getCurrent().width / scale, getCurrent().height / scale, getCurrent().width / scale, getCurrent().height / scale);
@@ -318,13 +318,13 @@ public class VirtualGLFWMouseImplementation implements MouseImplementation {
 		double n = 1.0F / textureWidth;
 		double o = 1.0F / textureHeight;
 		double z = 1000;
-		Tesselator bufferBuilder = Tesselator.instance;
-		bufferBuilder.begin(7);
-		bufferBuilder.vertexUV(x, y + height, z, 0, height * o);
-		bufferBuilder.vertexUV(x + width, y + height, z, width * n, height * o);
-		bufferBuilder.vertexUV(x + width, y, z, width * n, 0);
-		bufferBuilder.vertexUV(x, y, z, 0, 0);
-		bufferBuilder.end();
+		Tessellator bufferBuilder = Tessellator.INSTANCE;
+		bufferBuilder.start(7);
+		bufferBuilder.vertex(x, y + height, z, 0, height * o);
+		bufferBuilder.vertex(x + width, y + height, z, width * n, height * o);
+		bufferBuilder.vertex(x + width, y, z, width * n, 0);
+		bufferBuilder.vertex(x, y, z, 0, 0);
+		bufferBuilder.draw();
 	}
 
 	private void advanceAnimation() {

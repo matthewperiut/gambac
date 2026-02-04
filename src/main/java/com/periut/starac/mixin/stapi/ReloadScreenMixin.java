@@ -1,15 +1,17 @@
 package com.periut.starac.mixin.stapi;
 
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.Tesselator;
+import com.google.common.primitives.Floats;
+import com.periut.starac.StapiEarlyRenderLoopState;
+import lombok.val;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.render.Tessellator;
 import net.modificationstation.stationapi.api.client.resource.ReloadScreenManager;
 import net.modificationstation.stationapi.api.resource.ResourceReload;
-import org.lwjgl.opengl.GL11;
 import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.awt.*;
-import java.text.NumberFormat;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 
@@ -17,13 +19,34 @@ import java.util.concurrent.CompletionException;
 public abstract class ReloadScreenMixin extends Screen {
 
     @Shadow
-    protected abstract void fill(int startX, int startY, int endX, int endY, int color);
+    private boolean firstRenderTick;
+
+    @Shadow
+    private long initTimestamp;
+
+    @Shadow
+    private long currentTime;
+
+    @Shadow
+    private long lastRender;
 
     @Shadow
     private boolean exceptionThrown;
 
     @Shadow
     private boolean finished;
+
+    @Shadow
+    private long fadeOutStart;
+
+    @Shadow
+    private float scrollProgress;
+
+    @Shadow
+    private float progress;
+
+    @Shadow
+    private long exceptionStart;
 
     @Shadow
     private Exception exception;
@@ -37,100 +60,153 @@ public abstract class ReloadScreenMixin extends Screen {
     private Screen parent;
 
     @Shadow
-    private float progress;
+    @Final
+    private Runnable backgroundEmitter;
 
     @Shadow
     @Final
-    private Tesselator tessellator;
+    private Runnable stage0Emitter;
+
+    @Shadow
+    private long BACKGROUND_FADE_IN;
+
+    @Shadow
+    @Final
+    private long BACKGROUND_START;
+
+    @Shadow
+    private long STAGE_0_START;
+
+    @Shadow
+    private long STAGE_0_FADE_IN;
+
+    @Shadow
+    private long GLOBAL_FADE_OUT;
+
+    @Shadow
+    private long RELOAD_START;
+
+    @Shadow
+    private long EXCEPTION_TRANSFORM;
+
+    @Shadow
+    abstract boolean isReloadStarted();
+
+    // Wrap-up mode fields for EarlyRenderLoop
+    @Unique
+    private static final long WRAP_UP_DURATION = 100; // 100ms wrap-up period after loading
 
     @Unique
-    private static final NumberFormat NUMBER_FORMAT = NumberFormat.getNumberInstance();
+    private boolean starac_inWrapUp = false;
 
-    static {
-        NUMBER_FORMAT.setMinimumFractionDigits(2);
-        NUMBER_FORMAT.setMaximumFractionDigits(2);
+    @Unique
+    private long starac_wrapUpStart = 0;
+
+    /**
+     * Inject at the end of the constructor to set faster animation timings for EarlyRenderLoop mode.
+     */
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void starac_onConstructorReturn(Screen parent, Runnable done, Tessellator tessellator, CallbackInfo ci) {
+        if (StapiEarlyRenderLoopState.isUsingEarlyRenderLoop()) {
+            // Faster animations for single-threaded LWJGL3 mode
+            BACKGROUND_FADE_IN = 250;
+            STAGE_0_START = BACKGROUND_START + BACKGROUND_FADE_IN;
+            STAGE_0_FADE_IN = 500;
+            GLOBAL_FADE_OUT = 300;
+            RELOAD_START = STAGE_0_START + STAGE_0_FADE_IN;
+            EXCEPTION_TRANSFORM = 200;
+        }
     }
 
-    @Override
+    /**
+     * @author starac
+     * @reason Add wrap-up mode support for EarlyRenderLoop with faster animation completion
+     */
+    @Overwrite
     public void render(int mouseX, int mouseY, float delta) {
-        super.render(mouseX, mouseY, delta);
-        if (parent == null) renderEarly();
-        else renderNormal(delta);
+        if (firstRenderTick) {
+            firstRenderTick = false;
+            initTimestamp = System.currentTimeMillis();
+        }
+        currentTime = System.currentTimeMillis() - initTimestamp;
 
-        Optional<ResourceReload> reload;
-        float target = (starac_isReloadStarted() && (reload = ReloadScreenManager.getCurrentReload()).isPresent())
-                ? reload.orElse(null).getProgress() : 0;
-        progress = Math.max(0, Math.min(progress * .95F + target * .05F, 1));
-        if (Float.isNaN(progress)) progress = 0;
-        if (!exceptionThrown && !finished && ReloadScreenManager.isReloadComplete()) {
+        final long MAX_FPS = 60;
+        val partial = currentTime - lastRender < (1000 / MAX_FPS);
+        if (partial) currentTime = lastRender;
+        else lastRender = currentTime;
+        val locationsSize = ReloadScreenManagerAccessor.getLocations().size();
+
+        // Check if we should enter wrap-up mode (loading done, EarlyRenderLoop mode)
+        if (!exceptionThrown && !finished && !starac_inWrapUp && ReloadScreenManager.isReloadComplete()) {
+            if (StapiEarlyRenderLoopState.isUsingEarlyRenderLoop()) {
+                // Enter wrap-up mode - must complete before finishing
+                starac_inWrapUp = true;
+                starac_wrapUpStart = currentTime;
+            }
+        }
+
+        // During wrap-up, accelerate animations to catch up
+        float progressLerp = 0.05F;
+        float scrollLerp = 0.05F;
+        if (starac_inWrapUp) {
+            // Speed up lerping during wrap-up
+            progressLerp = 0.4F;
+            scrollLerp = 0.4F;
+
+            // Wrap-up MUST complete its full duration before finishing
+            val wrapUpElapsed = currentTime - starac_wrapUpStart;
+            if (wrapUpElapsed >= WRAP_UP_DURATION) {
+                try {
+                    ReloadScreenManager.getCurrentReload().ifPresent(ResourceReload::throwException);
+                    finished = true;
+                    fadeOutStart = currentTime;
+                    starac_inWrapUp = false;
+                } catch (CompletionException e) {
+                    exceptionThrown = true;
+                    exceptionStart = currentTime;
+                    exception = e;
+                    starac_inWrapUp = false;
+                    System.err.println("[starac] An exception occurred during resource loading");
+                    e.printStackTrace();
+                }
+            }
+        } else if (!exceptionThrown && !finished && !(scrollProgress + .1 < locationsSize) && !(progress + .1 < 1) && ReloadScreenManager.isReloadComplete()) {
+            // Original logic for non-EarlyRenderLoop mode
             try {
-                ReloadScreenManager.getCurrentReload().stream().peek(ResourceReload::throwException);
+                ReloadScreenManager.getCurrentReload().ifPresent(ResourceReload::throwException);
                 finished = true;
+                fadeOutStart = currentTime;
             } catch (CompletionException e) {
                 exceptionThrown = true;
+                exceptionStart = currentTime;
                 exception = e;
-                System.err.println("[Starac] An exception occurred during resource loading");
+                System.err.println("[starac] An exception occurred during resource loading");
                 e.printStackTrace();
             }
         }
-        if (finished) {
-            ReloadScreenManagerAccessor.onFinish();
+
+        if (!partial) {
+            Optional<ResourceReload> reload;
+            progress = Floats.constrainToRange(progress * (1 - progressLerp) + (isReloadStarted() && (reload = ReloadScreenManager.getCurrentReload()).isPresent() ? reload.get().getProgress() : 0) * progressLerp, 0, 1);
+            scrollProgress = Floats.constrainToRange(scrollProgress * (1 - scrollLerp) + locationsSize * scrollLerp, 0, locationsSize);
+        }
+        if ((finished ? currentTime <= fadeOutStart + GLOBAL_FADE_OUT : currentTime < BACKGROUND_START + BACKGROUND_FADE_IN) && parent != null)
+            parent.render(mouseX, mouseY, delta);
+        renderBackground();
+        super.render(mouseX, mouseY, delta);
+        stage0Emitter.run();
+        if (finished && currentTime - fadeOutStart > GLOBAL_FADE_OUT) {
+            // In EarlyRenderLoop mode, don't call onFinish() here - it will be called later
+            // This keeps reloadScreen set so isReloadComplete() returns true for StationAPI's while loop
+            if (!StapiEarlyRenderLoopState.isUsingEarlyRenderLoop()) {
+                ReloadScreenManagerAccessor.onFinish();
+            }
             done.run();
         }
     }
 
-    @Unique
-    private boolean starac_isReloadStarted() {
-        return true;
-    }
-
-    @Unique
-    private void renderEarly() {
-        GL11.glBindTexture(3553, minecraft.textures.loadTexture("/title/mojang.png"));
-        fill(0, 0, width, height, 0xFFFFFFFF);
-        drawMojangLogoQuad((width - 256) / 2, (height - 256) / 2);
-        GL11.glEnable(GL11.GL_BLEND);
-        renderText(Color.BLACK, false);
-        GL11.glDisable(GL11.GL_BLEND);
-    }
-
-    @Unique
-    private void drawMojangLogoQuad(int i, int j) {
-        float f = 0.00390625f;
-        float f2 = 0.00390625f;
-        tessellator.begin();
-        tessellator.vertexUV(i, j + 256, 0.0, 0, 256 * f2);
-        tessellator.vertexUV(i + 256, j + 256, 0.0, 256 * f, 256 * f2);
-        tessellator.vertexUV(i + 256, j, 0.0, 256 * f, 0);
-        tessellator.vertexUV(i, j, 0.0, 0, 0);
-        tessellator.end();
-    }
-
-    @Unique
-    private void renderNormal(float delta) {
-        parent.render(-1, -1, delta);
-        this.fillGradient(0, 0, this.width, this.height, -1072689136, -804253680);
-        renderText(Color.WHITE, true);
-    }
-
-    @Unique
-    private void renderText(Color textColor, boolean shadow) {
-        if (exceptionThrown) font.draw("Oh noes! An error occurred, check your logs.", 0, 0, textColor.getRGB(), shadow);
-        else font.draw("Loading resources...", 0, 0, textColor.getRGB(), shadow);
-        List<String> locations = ReloadScreenManagerAccessor.getLocations();
-        String s = locations.isEmpty() ? "Doing the do" : locations.get(locations.size() - 1);
-        font.draw(s, 5, height - 10, textColor.getRGB(), shadow);
-        String text = NUMBER_FORMAT.format(progress * 100f) + "%";
-        int textRendererWidth = font.width(text);
-        font.draw(text, width - textRendererWidth - 5, height - 10, textColor.getRGB(), shadow);
-    }
-
-    /**
-     * @author Starac
-     * @reason no animation so no need to wait
-     */
-    @Overwrite
-    public boolean isReloadStarted() {
-        return true;
+    @Override
+    public void renderBackground() {
+        backgroundEmitter.run();
     }
 }

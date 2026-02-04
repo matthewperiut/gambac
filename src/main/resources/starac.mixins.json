@@ -25,6 +25,8 @@
     "lwjgl3.MixinMinecraftDrawVirtualCursor",
     "lwjgl3.MixinResourceDownloadThread",
     "lwjgl3.MixinScreenFixClipboard",
+    "stapi.MixinMinecraftStapiCleanup",
+    "stapi.MixinMinecraftStapiCompat",
     "stapi.MixinReloadScreenManager",
     "stapi.ReloadScreenManagerAccessor",
     "stapi.ReloadScreenMixin"

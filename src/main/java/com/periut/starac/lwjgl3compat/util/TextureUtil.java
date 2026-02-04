@@ -1,12 +1,12 @@
 package com.periut.starac.lwjgl3compat.util;
 
 import java.nio.IntBuffer;
-import net.minecraft.client.MemoryTracker;
+import net.minecraft.client.util.GlAllocationUtils;
 import com.periut.starac.mixin.lwjgl3.MinecraftAccessor;
 import org.lwjgl.opengl.GL11;
 
 public class TextureUtil {
-	private static final IntBuffer BUFFER = MemoryTracker.createIntBuffer(4194304);
+	private static final IntBuffer BUFFER = GlAllocationUtils.allocateIntBuffer(4194304);
 
 	public static int genTextures() {
 		return GlStateManager.genTextures();
