@@ -101,7 +101,7 @@ public class MinecraftAppletMixin extends Applet {
      * @author DanyGames2014
      * @reason because i don't give a shit
      */
-    @Overwrite
+    @Overwrite(remap = false)
     public void startThread() { // startMainThread
         this.minecraft.run();
     }
@@ -111,12 +111,12 @@ public class MinecraftAppletMixin extends Applet {
         ci.cancel();
     }
 
-    @Inject(method = "stopThread", at = @At(value = "HEAD"), cancellable = true)
+    @Inject(method = "stopThread", at = @At(value = "HEAD"), remap = false, cancellable = true)
     public void stopThread(CallbackInfo ci) {
         ci.cancel();
     }
 
-    @Inject(method = "clearMemory", at = @At(value = "HEAD"), cancellable = true)
+    @Inject(method = "clearMemory", at = @At(value = "HEAD"), remap = false, cancellable = true)
     public void clearMemory(CallbackInfo ci) {
         ci.cancel();
     }
