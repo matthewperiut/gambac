@@ -1,5 +1,6 @@
 package com.periut.starac.mixin.stapi;
 
+import com.periut.starac.Starac;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,8 +22,8 @@ public class MixinMinecraftStapiCleanup {
             )
     )
     private void starac_cleanupAfterStationAPI(CallbackInfo ci) {
-        if (MixinMinecraftStapiCompat.needsOnFinishCleanup()) {
-            MixinMinecraftStapiCompat.clearOnFinishCleanup();
+        if (Starac.STAPI_NEEDS_ON_FINISH_CLEANUP) {
+            Starac.STAPI_NEEDS_ON_FINISH_CLEANUP = false;
             ReloadScreenManagerAccessor.onFinish();
             System.out.println("[starac] Called onFinish() to clean up ReloadScreenManager");
         }

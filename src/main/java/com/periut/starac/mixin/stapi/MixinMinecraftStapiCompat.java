@@ -2,6 +2,7 @@ package com.periut.starac.mixin.stapi;
 
 import com.periut.starac.LWJGLHelper;
 import com.periut.starac.StapiEarlyRenderLoopState;
+import com.periut.starac.Starac;
 import lombok.val;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -28,19 +29,6 @@ import static org.lwjgl.opengl.GL11.*;
 @Mixin(value = Minecraft.class, priority = 500) // Lower priority = runs first
 public class MixinMinecraftStapiCompat {
 
-    @Unique
-    private static boolean starac_needsOnFinishCleanup = false;
-
-    @Unique
-    public static boolean needsOnFinishCleanup() {
-        return starac_needsOnFinishCleanup;
-    }
-
-    @Unique
-    public static void clearOnFinishCleanup() {
-        starac_needsOnFinishCleanup = false;
-    }
-
     /**
      * Injects before StationAPI's stationapi_applyReloadsAndWait to handle EarlyRenderLoop mode.
      * When in EarlyRenderLoop mode, this runs the render loop.
@@ -65,7 +53,7 @@ public class MixinMinecraftStapiCompat {
         starac_runEarlyRenderLoop();
 
         // Mark that we need to call onFinish() after StationAPI's injection runs
-        starac_needsOnFinishCleanup = true;
+        Starac.STAPI_NEEDS_ON_FINISH_CLEANUP = true;
 
         // Don't cancel - StationAPI's injection will run next, but its while loop will exit
         // immediately since isReloadComplete() returns true
