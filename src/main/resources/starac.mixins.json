@@ -5,8 +5,10 @@
   "plugin": "com.periut.starac.lwjgl3compat.Lwjgl3MixinPostProcessor",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "retrocenter.PacketRegistryInvoker"
   ],
   "server": [
+    "retrocenter.ServerLoginHandlerSyncMixin"
   ],
   "client": [
     "MinecraftAppletMixin",
@@ -23,7 +25,14 @@
     "lwjgl3.MinecraftAccessor",
     "lwjgl3.MixinMinecraftDrawVirtualCursor",
     "lwjgl3.MixinResourceDownloadThread",
-    "lwjgl3.MixinScreenFixClipboard"
+    "lwjgl3.MixinScreenFixClipboard",
+    "retrocenter.TitleScreenChildMixin",
+    "retrocenter.DisconnectedScreenChildMixin",
+    "retrocenter.MinecraftStopExitMixin",
+    "retrocenter.MinecraftChildDirsMixin",
+    "retrocenter.ConnectScreenChildMixin",
+    "retrocenter.GameMenuChildMixin",
+    "retrocenter.ClientNetworkHandlerProbeMixin"
   ],
   "injectors": {
     "defaultRequire": 1

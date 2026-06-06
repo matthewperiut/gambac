@@ -27,6 +27,26 @@ public class BrnoMinecraft extends Minecraft {
 
     @Override
     public void handleCrash(CrashReport throwable) { // displayUnexpectedThrowable(UnexpectedThrowable)
+        // RetroCenter: a child instance must NOT open an AWT crash window
+        // (closing it would System.exit the whole JVM, hub included). The
+        // crash report is plumbed back to the hub, which shows it on its
+        // own scrollable crash screen.
+        if (com.periut.starac.retrocenter.RetroCenter.isChildInstance()) {
+            com.periut.starac.retrocenter.bridge.HubBridge.lockChildPresenting();
+            StringBuilder report = new StringBuilder();
+            if (throwable.description != null) {
+                report.append(throwable.description).append("\n\n");
+            }
+            if (throwable.exception != null) {
+                java.io.StringWriter stack = new java.io.StringWriter();
+                throwable.exception.printStackTrace(new java.io.PrintWriter(stack));
+                report.append(stack);
+            }
+            com.periut.starac.retrocenter.bridge.HubBridge.noteChildCrash(report.toString());
+            com.periut.starac.retrocenter.bridge.HubBridge.childGameEnded("crashed");
+            Display.destroy(); // child path: detaches from the shared window
+            return;
+        }
         this.frame.removeAll();
         this.frame.add(new CrashReportPanel(throwable), "Center");
         this.frame.validate();

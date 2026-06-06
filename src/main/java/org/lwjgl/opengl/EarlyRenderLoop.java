@@ -37,9 +37,15 @@ public final class EarlyRenderLoop {
         long frameTimeNanos = targetFps > 0 ? 1_000_000_000L / targetFps : 0;
         long lastFrameTime = System.nanoTime();
 
+        // RetroCenter: a child instance neither pumps GLFW events (the
+        // parked hub thread owns the event queue) nor presents while the
+        // present gate holds (the hub's last frame stays on screen).
+        boolean retrocenterChild = com.periut.starac.retrocenter.bridge.HubBridge.callerIsChild();
         while (shouldContinue.getAsBoolean()) {
             // Proper event polling
-            GLFW.glfwPollEvents();
+            if (!retrocenterChild) {
+                GLFW.glfwPollEvents();
+            }
 
             // Poll input devices
             if (Mouse.isCreated()) {
@@ -57,7 +63,9 @@ public final class EarlyRenderLoop {
             render.run();
 
             // Swap buffers
-            GLFW.glfwSwapBuffers(handle);
+            if (!retrocenterChild || com.periut.starac.retrocenter.bridge.HubBridge.mayChildPresent()) {
+                GLFW.glfwSwapBuffers(handle);
+            }
 
             // Frame rate limiting
             if (frameTimeNanos > 0) {

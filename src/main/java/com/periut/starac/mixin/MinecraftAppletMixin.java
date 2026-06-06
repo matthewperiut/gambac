@@ -29,8 +29,18 @@ public class MinecraftAppletMixin extends Applet {
      */
     @Overwrite(remap = false)
     public void init() {
-        //System.out.println("Properties:");
-        //System.getProperties().forEach( (k, v) -> System.out.println(k + " : " + v));
+        // RetroCenter: child instances never show their applet frame — hide
+        // it immediately (init runs on the AWT thread, so this is safe)
+        // instead of waiting for the invokeLater at the end of init.
+        if (com.periut.starac.retrocenter.RetroCenter.isChildInstance()) {
+            try {
+                hideThemAll(this.getParent().getParent().getParent());
+                hideThemAll(this.getParent().getParent());
+                hideThemAll(this.getParent());
+                hideThemAll(this);
+            } catch (Exception ignored) {
+            }
+        }
 
         // PrismLauncher Window Size
         if (System.getProperty("org.prismlauncher.window.dimensions") != null) {
@@ -74,6 +84,18 @@ public class MinecraftAppletMixin extends Applet {
             this.minecraft.setStartupServer(this.getParameter("server"), Integer.parseInt(this.getParameter("port")));
         }
 
+        // RetroCenter: a child instance reuses the hub's authenticated
+        // session (retroauth re-derives its auth state from the raw
+        // sessionId string) and autoconnects to its assigned server.
+        com.periut.starac.retrocenter.bridge.ChildConfig retrocenterConfig =
+                com.periut.starac.retrocenter.bridge.HubBridge.childConfig();
+        if (com.periut.starac.retrocenter.RetroCenter.isChildInstance() && retrocenterConfig != null) {
+            this.minecraft.session = new Session(retrocenterConfig.username, retrocenterConfig.sessionId);
+            this.minecraft.setStartupServer(retrocenterConfig.host, retrocenterConfig.port);
+            System.out.println("[RetroCenter] child session + autoconnect configured for "
+                    + retrocenterConfig.host + ":" + retrocenterConfig.port);
+        }
+
         this.startThread();
 
         SwingUtilities.invokeLater(() -> {
@@ -103,12 +125,30 @@ public class MinecraftAppletMixin extends Applet {
     }
 
     /**
-     * @author DanyGames2014
-     * @reason because i don't give a shit
+     * Run the game loop on a dedicated thread (like vanilla did) instead of
+     * inline. The applet path dispatches init on the JVM-wide AWT
+     * EventQueue; running the loop inline would occupy that queue forever,
+     * which both starves any in-process child instance's init AND couples
+     * unrelated AWT users to the game loop.
+     *
+     * @author DanyGames2014, matthewperiut
+     * @reason de-AWT + RetroCenter multi-instance support
      */
     @Overwrite(remap = false)
     public void startThread() { // startMainThread
-        this.minecraft.run();
+        Thread thread = new Thread(() -> this.minecraft.run(), "Minecraft main thread");
+        thread.setUncaughtExceptionHandler((t, e) -> {
+            e.printStackTrace();
+            if (com.periut.starac.retrocenter.RetroCenter.isChildInstance()) {
+                // The hub is parked waiting on this child — a dead game
+                // thread must hand the window back, not hang the JVM.
+                java.io.StringWriter stack = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(stack));
+                com.periut.starac.retrocenter.bridge.HubBridge.noteChildCrash(stack.toString());
+                com.periut.starac.retrocenter.bridge.HubBridge.childGameEnded("Child instance crashed: " + e);
+            }
+        });
+        thread.start();
     }
 
     @Inject(method = "destroy", at = @At(value = "HEAD"), remap = false, cancellable = true)

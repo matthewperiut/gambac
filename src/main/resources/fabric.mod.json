@@ -4,7 +4,7 @@
   "version": "${version}",
 
   "name": "Staráč",
-  "description": "Modernizes Minecraft Beta libraries for the best experience on modern OSes",
+  "description": "Modernizes Minecraft Beta libraries for the best experience on modern OSes. With OSL installed, adds RetroCenter: server-driven mod sync and per-server child instances sharing one window.",
   "authors": [
     "Slainlight",
     "DanyGames2014"
@@ -18,6 +18,18 @@
   "entrypoints": {
     "preLaunch": [
       "com.periut.starac.StaracPreLaunch"
+    ],
+    "main": [
+      "com.periut.starac.retrocenter.RetroCenterMain"
+    ],
+    "init": [
+      "com.periut.starac.retrocenter.RetroCenterInit"
+    ],
+    "client-init": [
+      "com.periut.starac.retrocenter.RetroCenterClientInit"
+    ],
+    "server-init": [
+      "com.periut.starac.retrocenter.RetroCenterServerInit"
     ],
     "stationapi:event_bus": [
     ],
@@ -33,5 +45,8 @@
   "depends": {
     "minecraft": "1.0.0-beta.7.3",
     "java": ">=21"
+  },
+  "suggests": {
+    "osl-networking": "*"
   }
 }

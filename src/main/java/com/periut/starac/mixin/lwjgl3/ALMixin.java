@@ -41,7 +41,11 @@ public abstract class ALMixin {
 	@Public
 	private static void create(String deviceArguments, int contextFrequency, int contextRefresh, boolean contextSynchronized, boolean openDevice) throws LWJGLException {
 		if (_created) {
-			throw new IllegalStateException("Only one OpenAL context may be instantiated at any one time.");
+			// RetroCenter: this AL class is shared between the hub and
+			// in-process child instances. A second instance's create() means
+			// "give me a working context" — the live shared one is exactly
+			// that, so reuse it instead of failing the caller into silence.
+			return;
 		} else {
 			init(deviceArguments, contextFrequency, contextRefresh, contextSynchronized, openDevice);
 			_created = true;

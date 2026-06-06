@@ -37,6 +37,11 @@ public class LibraryLWJGLOpenALMixin {
 
 	@Unique
 	private static void exitAL() {
+		// RetroCenter: the OpenAL context is shared with the hub; a child
+		// instance shutting its sound system down must not destroy it.
+		if (com.periut.starac.retrocenter.RetroCenter.isChildInstance()) {
+			return;
+		}
 		try {
 			alExit.invoke();
 		} catch (Throwable ignored) {

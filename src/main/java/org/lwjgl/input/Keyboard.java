@@ -158,6 +158,10 @@ public class Keyboard {
 //        synchronized (OpenGLPackageAccess.global_lock) {
             if (!created)
                 return;
+            // RetroCenter: shared keyboard + its GLFW callbacks belong to
+            // the hub's window — children must not free the upcall stubs
+            // out from under it (see Mouse.destroy).
+            if (com.periut.starac.retrocenter.bridge.HubBridge.callerIsChild()) return;
             created = false;
             implementation.destroyKeyboard();
             reset();
@@ -189,6 +193,8 @@ public class Keyboard {
 //        synchronized (OpenGLPackageAccess.global_lock) {
             if (!created)
                 throw new IllegalStateException("Keyboard must be created before you can poll the device");
+            // RetroCenter: only the window-owning instance may drain input
+            if (!com.periut.starac.retrocenter.bridge.HubBridge.isOwner()) return;
             implementation.pollKeyboard(keyDownBuffer);
             read();
 //        }
@@ -274,6 +280,8 @@ public class Keyboard {
 //        synchronized (OpenGLPackageAccess.global_lock) {
             if (!created)
                 throw new IllegalStateException("Keyboard must be created before you can read events");
+            // RetroCenter: only the window-owning instance may drain input
+            if (!com.periut.starac.retrocenter.bridge.HubBridge.isOwner()) return false;
 
             boolean result;
             while ((result = readNext(current_event)) && current_event.repeat && !repeat_enabled)

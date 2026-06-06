@@ -35,6 +35,11 @@ public final class Display {
 	private static boolean window_resized = true;
 	@Nullable
 	private static GLFWWindowSizeCallback sizeCallback;
+	// Must be strongly referenced: LWJGL upcall stubs are freed when their
+	// Java callback object is GC'd, and a freed stub SIGSEGVs the JVM the
+	// next time the native side fires it (upcall_stub_load_target crashes).
+	@Nullable
+	private static GLFWWindowFocusCallback focusCallback;
 	@Nullable
 	private static ByteBuffer[] cached_icons = null;
 	private static boolean focused;
@@ -409,7 +414,64 @@ public final class Display {
 	}
 
 	public static void update() {
+		// RetroCenter window ownership: when an in-process child instance
+		// owns the window, the hub's render thread parks here (releasing the
+		// GL context first so the child can bind it). It wakes when the
+		// child gives the window back, re-acquires the context and resumes.
+		int retrocenterCaller = com.periut.starac.retrocenter.bridge.HubBridge.callerInstance();
+		if (!com.periut.starac.retrocenter.bridge.HubBridge.isOwnerInstance(retrocenterCaller)) {
+			if (retrocenterCaller == com.periut.starac.retrocenter.bridge.HubBridge.HUB) {
+				// Park as a PUMP LOOP: this is the thread that created the
+				// window, so it must keep polling GLFW events — keeps the
+				// window responsive and feeds input callbacks while the
+				// child renders (GL moves threads; the event pump doesn't).
+				com.periut.starac.retrocenter.bridge.HubBridge.hubParkBegin();
+				GLFW.glfwMakeContextCurrent(MemoryUtil.NULL);
+				// glfwWaitEventsTimeout (NOT a sleep loop): on Wayland the
+				// child's swapBuffers blocks on frame callbacks that arrive
+				// through THIS event queue — the pump must dispatch them at
+				// monitor rate or the child's framerate caps at the poll
+				// interval. WaitEvents wakes per event; idle costs nothing.
+				while (!com.periut.starac.retrocenter.bridge.HubBridge.hubOwnsWindow()) {
+					GLFW.glfwWaitEventsTimeout(0.05);
+					WaylandCenterCursor.finishWarp(); // dispatch child-requested warps
+				}
+				com.periut.starac.retrocenter.bridge.HubBridge.hubParkEnd();
+				GLFW.glfwMakeContextCurrent(handle);
+				GL.createCapabilities();
+				// Set the hub's destination screen BEFORE anything renders.
+				Runnable retrocenterWake = com.periut.starac.retrocenter.bridge.HubBridge.consumeHubWakeCallback();
+				if (retrocenterWake != null) {
+					try {
+						retrocenterWake.run();
+					} catch (Throwable t) {
+						t.printStackTrace();
+					}
+				}
+				window_resized = true;
+			}
+			return; // skip this frame (hub: first frame after wake; child: post-teardown safety)
+		}
+		// A child owner must NOT pump GLFW events — the parked hub thread
+		// (the window's creator) does that; the child only swaps + drains
+		// the shared input queues.
+		boolean retrocenterChildCaller = retrocenterCaller != com.periut.starac.retrocenter.bridge.HubBridge.HUB;
 		window_resized = false;
+		if (retrocenterChildCaller) {
+			if (Mouse.isCreated()) {
+				Mouse.poll();
+			}
+			if (Keyboard.isCreated()) {
+				Keyboard.poll();
+			}
+			// Present gate: during the child's boot (Mojang splash, texture
+			// loading) the hub's last frame stays on screen — the child's
+			// frames are held until it reaches its logging-in screen.
+			if (com.periut.starac.retrocenter.bridge.HubBridge.mayChildPresent()) {
+				GLFW.glfwSwapBuffers(handle);
+			}
+			return;
+		}
 		if (usingGlfwAsync) {
 			// Unlock the CGL context so the macOS compositor can safely access
 			// the GL surface during event processing (e.g. window resize).
@@ -448,6 +510,20 @@ public final class Display {
 	}
 
 	public static void create(@NotNull PixelFormat pixelFormat) throws LWJGLException {
+		// RetroCenter: an in-process child instance attaches to the existing
+		// window instead of creating one. It blocks until the hub has parked
+		// (released the GL context), then binds the context to its own
+		// render thread. Same window, same context — only the owner changes.
+		if (com.periut.starac.retrocenter.bridge.HubBridge.callerIsChild() && isCreated()) {
+			System.out.println("[RetroCenter] child attaching to existing window");
+			com.periut.starac.retrocenter.bridge.HubBridge.awaitHubParked();
+			GLFW.glfwMakeContextCurrent(handle);
+			GL.createCapabilities();
+			GLFW.glfwSwapInterval(0);
+			com.periut.starac.retrocenter.bridge.HubBridge.noteChildAttached();
+			window_resized = true;
+			return;
+		}
 		ensureInitialized();
 		// Configure GLFW
 		GLFW.glfwDefaultWindowHints();
@@ -501,11 +577,12 @@ public final class Display {
 		// create general callbacks
 		sizeCallback = GLFWWindowSizeCallback.create(Display::resizeCallback);
 		GLFW.glfwSetWindowSizeCallback(handle, sizeCallback);
-		GLFW.glfwSetWindowFocusCallback(handle, (window, focused1) -> {
+		focusCallback = GLFWWindowFocusCallback.create((window, focused1) -> {
 			if (window == handle) {
 				focused = focused1;
 			}
 		});
+		GLFW.glfwSetWindowFocusCallback(handle, focusCallback);
 		Mouse.create();
 		Keyboard.create();
 		// Center window on primary monitor (not supported on Wayland)
@@ -605,6 +682,15 @@ public final class Display {
 		if (handle == -1L) {
 			return; // Not created, nothing to destroy
 		}
+		// RetroCenter: a child instance detaches instead of destroying — the
+		// window belongs to the hub, which re-acquires the context when the
+		// child's launcher returns ownership.
+		if (com.periut.starac.retrocenter.bridge.HubBridge.callerIsChild()) {
+			System.out.println("[RetroCenter] child detaching from window");
+			GLFW.glfwMakeContextCurrent(MemoryUtil.NULL);
+			com.periut.starac.retrocenter.bridge.HubBridge.childGameEnded(null);
+			return;
+		}
 		if (usingGlfwAsync && GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_COCOA) {
 			MacOSDisplayHelper.unlockCGLContext();
 		}
@@ -613,6 +699,10 @@ public final class Display {
 		if (sizeCallback != null) {
 			sizeCallback.free();
 			sizeCallback = null;
+		}
+		if (focusCallback != null) {
+			focusCallback.free();
+			focusCallback = null;
 		}
 		Mouse.destroy();
 		Keyboard.destroy();
@@ -693,6 +783,13 @@ public final class Display {
 	}
 
 	public static void swapBuffers() {
+		// Present gate (see update()): the Mojang splash presents through
+		// THIS path, not update() — a booting child's frames are held until
+		// it reaches its logging-in screen.
+		if (com.periut.starac.retrocenter.bridge.HubBridge.callerIsChild()
+				&& !com.periut.starac.retrocenter.bridge.HubBridge.mayChildPresent()) {
+			return;
+		}
 		GLFW.glfwSwapBuffers(handle);
 	}
 }

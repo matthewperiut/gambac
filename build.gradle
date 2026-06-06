@@ -57,6 +57,12 @@ dependencies {
 
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
+    // OSL — compile-time + dev-runtime. At RUNTIME OSL is OPTIONAL: every
+    // OSL-touching class is gated behind OSL's own entrypoints, so when
+    // osl-networking is absent the hub/sync feature is dormant and the rest
+    // of starac works unchanged (see RetroCenter javadoc).
+    ploceus.dependOsl(project.osl_version)
+
     api platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
     include platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
 
@@ -111,6 +117,56 @@ tasks.withType(Jar).configureEach {
         rename { "${it}_${project.archives_base_name}"}
     }
 }
+
+// starac minus org/lwjgl/** and bundled natives: what in-process child
+// instances load as a mod. The child classloader shares org.lwjgl with the
+// hub (one window, one set of natives), so the child's copy of starac must
+// not carry its own — see ChildClassLoader / InProcessChildLauncher.
+tasks.register('childShimJar', Jar) {
+    dependsOn tasks.named('classes'), tasks.named('processResources')
+    from sourceSets.main.output
+    exclude 'org/lwjgl/**'
+    exclude 'natives/**'
+    // The bridge MUST resolve to the hub's single copy via parent
+    // delegation — a child-local copy would have its own (empty) statics.
+    exclude 'com/periut/starac/retrocenter/bridge/**'
+    archiveClassifier = 'childshim'
+}
+
+// The shim must match the runtime's mappings: production runs intermediary,
+// so it gets its own remap pass... (untyped wiring: loom's task classes live
+// in a different plugin classloader, so typed named() lookups reject them)
+def childShimName = "${project.archives_base_name}-${project.version}-childshim"
+tasks.register('remapChildShimJar', net.fabricmc.loom.task.RemapJarTask) {
+    dependsOn tasks.named('childShimJar')
+    inputFile.set(layout.buildDirectory.file("libs/${childShimName}.jar"))
+    archiveClassifier.set('childshim-intermediary')
+    // no jar-in-jar: the child must NOT get its own LWJGL (shared with hub)
+    addNestedDependencies.set(false)
+}
+
+// ...and is embedded INSIDE the distributed starac jar at
+// retrocenter/childshim.jar — ServerProfiles self-extracts it at runtime,
+// no manual install step.
+tasks.named('remapJar') {
+    dependsOn tasks.named('remapChildShimJar')
+    from(layout.buildDirectory.file("libs/${childShimName}-intermediary.jar")) {
+        into 'retrocenter'
+        rename { 'childshim.jar' }
+    }
+}
+
+// Dev runs use named mappings: point child launches straight at the
+// named shim so in-process children work in runClient without any setup.
+loom {
+    runs {
+        configureEach {
+            vmArg "-Dretrocenter.childShimJar=${layout.buildDirectory.get().asFile}/libs/${project.archives_base_name}-${project.version}-childshim.jar"
+        }
+    }
+}
+
+tasks.named('build') { dependsOn 'childShimJar', 'remapChildShimJar' }
 
 // configure the maven publication
 publishing {

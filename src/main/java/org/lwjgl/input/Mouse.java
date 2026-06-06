@@ -312,6 +312,11 @@ public class Mouse {
     public static void destroy() {
 //        synchronized (OpenGLPackageAccess.global_lock) {
             if (!created) return;
+            // RetroCenter: the mouse (and its GLFW callbacks / upcall stubs)
+            // belongs to the hub's window. A child's Minecraft.stop() calls
+            // destroy too — freeing the callbacks while the window still
+            // fires them SIGSEGVs the JVM. Children detach, never destroy.
+            if (com.periut.starac.retrocenter.bridge.HubBridge.callerIsChild()) return;
             created = false;
             buttons = null;
             coord_buffer = null;
@@ -347,6 +352,8 @@ public class Mouse {
     public static void poll() {
 //        synchronized (OpenGLPackageAccess.global_lock) {
             if (!created) throw new IllegalStateException("Mouse must be created before you can poll it");
+            // RetroCenter: only the window-owning instance may drain input
+            if (!com.periut.starac.retrocenter.bridge.HubBridge.isOwner()) return;
             implementation.pollMouse(coord_buffer, buttons);
 
             /* If we're grabbed, poll returns mouse deltas, if not it returns absolute coordinates */
@@ -441,6 +448,8 @@ public class Mouse {
     public static boolean next() {
 //        synchronized (OpenGLPackageAccess.global_lock) {
             if (!created) throw new IllegalStateException("Mouse must be created before you can read events");
+            // RetroCenter: only the window-owning instance may drain input
+            if (!com.periut.starac.retrocenter.bridge.HubBridge.isOwner()) return false;
             if (readBuffer.hasRemaining()) {
                 eventButton = readBuffer.get();
                 eventState = readBuffer.get() != 0;
