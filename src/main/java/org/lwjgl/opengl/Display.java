@@ -110,6 +110,27 @@ public final class Display {
 		}
 	}
 
+	/**
+	 * Sets an environment variable in the native process environment (visible
+	 * to native libraries via getenv, unlike System.setProperty). Works on
+	 * Linux (libc) and macOS (libSystem). Must be called before the library
+	 * that reads the variable is loaded/initialized.
+	 */
+	public static void setNativeEnv(String name, String value) {
+		try {
+			String libName = OS.current() == OS.OSX ? "libSystem.B.dylib" : "libc.so.6";
+			org.lwjgl.system.SharedLibrary libc = org.lwjgl.system.APIUtil.apiCreateLibrary(libName);
+			long setenv = libc.getFunctionAddress("setenv");
+			if (setenv == 0) {
+				System.out.println("[Starac] Could not find setenv in " + libName);
+				return;
+			}
+			nativeSetenv(setenv, name, value);
+		} catch (Exception e) {
+			System.out.println("[Starac] Could not set " + name + ": " + e.getMessage());
+		}
+	}
+
 	private static void nativeSetenv(long setenvAddr, String name, String value) {
 		ByteBuffer nameBuf = MemoryUtil.memASCII(name, true);
 		ByteBuffer valueBuf = MemoryUtil.memASCII(value, true);
@@ -219,6 +240,15 @@ public final class Display {
 		}
 
 		if (!forceX11Fallback && System.getenv("WAYLAND_DISPLAY") != null && GLFW.glfwPlatformSupported(GLFW.GLFW_PLATFORM_WAYLAND)) {
+			// NVIDIA on Wayland: the driver's threaded optimizations break the
+			// game (user-reported). The driver reads this env var when libGL/EGL
+			// initializes, which happens at context creation — after this point —
+			// so setenv here is early enough. Respect a user-set value.
+			if (System.getenv("__GL_THREADED_OPTIMIZATIONS") == null
+					&& Files.exists(Path.of("/sys/module/nvidia"))) {
+				setNativeEnv("__GL_THREADED_OPTIMIZATIONS", "0");
+				System.out.println("[Starac] NVIDIA on Wayland detected, set __GL_THREADED_OPTIMIZATIONS=0");
+			}
 			setupCursorTheme();
 			// Compositors without xdg-decoration (e.g. GNOME, Cinnamon) need
 			// a patched libdecor-gtk plugin for window decorations.
