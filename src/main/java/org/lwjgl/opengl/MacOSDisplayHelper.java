@@ -19,8 +19,10 @@ final class MacOSDisplayHelper {
 	/**
 	 * Opt the NSApplication into system appearance inheritance by calling
 	 * [[NSApplication sharedApplication] setAppearance:nil].
-	 * This must be called after glfwInit() (which creates NSApp) but before
-	 * any windows are created, so there are no threading concerns.
+	 * Newer macOS versions hard-assert (NSInternalInconsistencyException in
+	 * ViewBridge) when appearance changes happen off the main thread, and
+	 * under glfw_async we usually run on the game thread — so the call is
+	 * bounced to the main thread when needed.
 	 */
 	static void initAppAppearance() {
 		try {
@@ -33,10 +35,31 @@ final class MacOSDisplayHelper {
 
 			// [NSApp setAppearance:nil] — nil means inherit system appearance
 			long selSetAppearance = ObjCRuntime.sel_getUid("setAppearance:");
-			JNI.invokePPPP(nsApp, selSetAppearance, 0L, objc_msgSend);
+			if (isMainThread(objc_msgSend)) {
+				JNI.invokePPPP(nsApp, selSetAppearance, 0L, objc_msgSend);
+			} else {
+				performOnMainThread(nsApp, selSetAppearance, 0L, objc_msgSend);
+			}
 		} catch (Exception e) {
 			System.err.println("[Display] Failed to init macOS app appearance: " + e.getMessage());
 		}
+	}
+
+	/** [NSThread isMainThread] */
+	private static boolean isMainThread(long objc_msgSend) {
+		long nsThreadClass = ObjCRuntime.objc_getClass("NSThread");
+		long selIsMainThread = ObjCRuntime.sel_getUid("isMainThread");
+		return JNI.invokePPP(nsThreadClass, selIsMainThread, objc_msgSend) != 0L;
+	}
+
+	/**
+	 * [target performSelectorOnMainThread:selector withObject:object
+	 * waitUntilDone:NO] — fire-and-forget so we never deadlock if the main
+	 * thread isn't pumping a runloop.
+	 */
+	private static void performOnMainThread(long target, long selector, long object, long objc_msgSend) {
+		long selPerform = ObjCRuntime.sel_getUid("performSelectorOnMainThread:withObject:waitUntilDone:");
+		JNI.invokePPPPPP(target, selPerform, selector, object, 0L, objc_msgSend);
 	}
 
 	/**
@@ -108,7 +131,12 @@ final class MacOSDisplayHelper {
 			long selSharedApp = ObjCRuntime.sel_getUid("sharedApplication");
 			long nsApp = JNI.invokePPP(nsAppClass, selSharedApp, objc_msgSend);
 			long selSetIcon = ObjCRuntime.sel_getUid("setApplicationIconImage:");
-			JNI.invokePPPP(nsApp, selSetIcon, nsImage, objc_msgSend);
+			if (isMainThread(objc_msgSend)) {
+				JNI.invokePPPP(nsApp, selSetIcon, nsImage, objc_msgSend);
+			} else {
+				// Same main-thread-only AppKit rule as setAppearance:.
+				performOnMainThread(nsApp, selSetIcon, nsImage, objc_msgSend);
+			}
 
 			System.out.println("[Starac] Set macOS Dock icon");
 		} catch (Exception e) {

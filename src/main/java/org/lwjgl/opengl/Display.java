@@ -502,18 +502,7 @@ public final class Display {
 			}
 			return;
 		}
-		if (usingGlfwAsync) {
-			// Unlock the CGL context so the macOS compositor can safely access
-			// the GL surface during event processing (e.g. window resize).
-			// Without this, the compositor and game thread race on the GL
-			// surface, causing SIGSEGV in AppleMetalOpenGLRenderer.
-			GL11.glFinish();
-			MacOSDisplayHelper.unlockCGLContext();
-			GLFW.glfwPollEvents();
-			MacOSDisplayHelper.relockCGLContext();
-		} else {
-			GLFW.glfwPollEvents();
-		}
+		pollEvents();
 		if (OS.current() == OS.WINDOWS) {
 			WindowsDisplayHelper.pollThemeChange();
 		}
@@ -529,6 +518,29 @@ public final class Display {
 		// After GLFW commits the surface via swapBuffers, dispatch any
 		// pending cursor warp so the lock callback fires.
 		WaylandCenterCursor.finishWarp();
+	}
+
+	/**
+	 * Async-safe glfwPollEvents. ALWAYS use this instead of calling
+	 * GLFW.glfwPollEvents() directly: with glfw_async the poll is dispatched
+	 * to the macOS main thread, and the game thread holds the CGL context
+	 * lock — if a screen/dock notification makes GLFW's observer call
+	 * [NSOpenGLContext update] (which takes the CGL lock) on the main thread
+	 * at the same time, a raw poll deadlocks (main thread waits on the CGL
+	 * lock, game thread waits on the main thread). Unlocking around the poll
+	 * also lets the compositor safely access the GL surface during event
+	 * processing (e.g. window resize) — without it, the compositor and game
+	 * thread race on the surface, causing SIGSEGV in AppleMetalOpenGLRenderer.
+	 */
+	public static void pollEvents() {
+		if (usingGlfwAsync) {
+			GL11.glFinish();
+			MacOSDisplayHelper.unlockCGLContext();
+			GLFW.glfwPollEvents();
+			MacOSDisplayHelper.relockCGLContext();
+		} else {
+			GLFW.glfwPollEvents();
+		}
 	}
 
 	public static void create() {

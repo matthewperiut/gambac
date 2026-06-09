@@ -42,9 +42,10 @@ public final class EarlyRenderLoop {
         // present gate holds (the hub's last frame stays on screen).
         boolean retrocenterChild = com.periut.starac.retrocenter.bridge.HubBridge.callerIsChild();
         while (shouldContinue.getAsBoolean()) {
-            // Proper event polling
+            // Proper event polling (async-safe: raw glfwPollEvents deadlocks
+            // against the CGL lock on macOS with glfw_async)
             if (!retrocenterChild) {
-                GLFW.glfwPollEvents();
+                Display.pollEvents();
             }
 
             // Poll input devices

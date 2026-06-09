@@ -74,7 +74,7 @@ public abstract class MinecraftMixin {
             Display.setIcon(icons);
         }
 
-        GLFW.glfwPollEvents();
+        Display.pollEvents();
         this.displayWidth = Display.getWidth();
         this.displayHeight = Display.getHeight();
         if (this.displayWidth <= 0) this.displayWidth = 1;
@@ -106,7 +106,7 @@ public abstract class MinecraftMixin {
     // Also force update at end of init for good measure
     @Inject(method = "init", at = @At("TAIL"))
     private void forceUpdateScreenSize(CallbackInfo ci) {
-        GLFW.glfwPollEvents();
+        Display.pollEvents();
         this.displayWidth = Display.getWidth();
         this.displayHeight = Display.getHeight();
         if (this.displayWidth <= 0) {

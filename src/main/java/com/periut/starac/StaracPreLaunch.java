@@ -69,9 +69,15 @@ public class StaracPreLaunch implements PreLaunchEntrypoint {
 	}
 
 	private void setupMacOS() {
-		// Check if -XstartOnFirstThread is already active
+		// -XstartOnFirstThread deadlocks this mod on macOS: fabric-loader's
+		// applet wrapper creates a java.awt.Frame, and AWT's Metal pipeline
+		// init blocks forever waiting on the main-thread run loop, which
+		// nobody pumps once main() returns. glfw_async has the same problem
+		// (it dispatches to the unpumped main queue), so the only fix is to
+		// relaunch the JVM without the flag.
 		long pid = ProcessHandle.current().pid();
 		if ("1".equals(System.getenv("JAVA_STARTED_ON_FIRST_THREAD_" + pid))) {
+			relaunchWithoutStartOnFirstThread();
 			return;
 		}
 
@@ -82,5 +88,59 @@ public class StaracPreLaunch implements PreLaunchEntrypoint {
 		Configuration.GLFW_LIBRARY_NAME.set("glfw_async");
 
 		System.out.println("[Starac] macOS detected without -XstartOnFirstThread, using glfw_async");
+	}
+
+	/**
+	 * Respawns the JVM without -XstartOnFirstThread, pipes its output through
+	 * this process (so launchers stay attached to their child and keep showing
+	 * logs), and exits with the game's exit code.
+	 *
+	 * The command is rebuilt from the running JVM (input args + classpath +
+	 * Knot + the game's launch args) rather than the original argv: launcher
+	 * wrappers like Prism's EntryPoint read their config from stdin, which is
+	 * already consumed, so re-running the original command would hang.
+	 */
+	private void relaunchWithoutStartOnFirstThread() {
+		if (System.getProperty("starac.relaunched") != null) {
+			// Relaunch guard: something re-added the flag; don't loop forever.
+			System.err.println("[Starac] -XstartOnFirstThread still present after relaunch, giving up."
+					+ " Remove it from your launcher's Java arguments (Prism: the FirstThreadOnMacOS trait).");
+			return;
+		}
+
+		try {
+			String javaBin = ProcessHandle.current().info().command()
+					.orElse(System.getProperty("java.home") + "/bin/java");
+
+			java.util.List<String> command = new java.util.ArrayList<>();
+			command.add(javaBin);
+			command.add("-Dstarac.relaunched=true");
+			// -XstartOnFirstThread is consumed by the java launcher and not
+			// reported here, but filter defensively in case a JVM passes it.
+			for (String arg : java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments()) {
+				if (!"-XstartOnFirstThread".equals(arg)) {
+					command.add(arg);
+				}
+			}
+			command.add("-cp");
+			command.add(System.getProperty("java.class.path"));
+
+			boolean client = net.fabricmc.loader.api.FabricLoader.getInstance().getEnvironmentType()
+					== net.fabricmc.api.EnvType.CLIENT;
+			command.add(client
+					? "net.fabricmc.loader.impl.launch.knot.KnotClient"
+					: "net.fabricmc.loader.impl.launch.knot.KnotServer");
+			command.addAll(java.util.Arrays.asList(
+					net.fabricmc.loader.impl.FabricLoaderImpl.INSTANCE.getLaunchArguments(false)));
+
+			System.out.println("[Starac] -XstartOnFirstThread deadlocks AWT on macOS; relaunching without it...");
+			Process child = new ProcessBuilder(command).inheritIO().start();
+			Runtime.getRuntime().addShutdownHook(new Thread(child::destroy));
+			System.exit(child.waitFor());
+		} catch (Exception e) {
+			System.err.println("[Starac] Relaunch failed: " + e.getMessage()
+					+ " — remove -XstartOnFirstThread from your launcher's Java arguments manually"
+					+ " (Prism: the FirstThreadOnMacOS trait).");
+		}
 	}
 }
