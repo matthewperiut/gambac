@@ -22,15 +22,6 @@
     "main": [
       "com.periut.starac.retrocenter.RetroCenterMain"
     ],
-    "init": [
-      "com.periut.starac.retrocenter.RetroCenterInit"
-    ],
-    "client-init": [
-      "com.periut.starac.retrocenter.RetroCenterClientInit"
-    ],
-    "server-init": [
-      "com.periut.starac.retrocenter.RetroCenterServerInit"
-    ],
     "stationapi:event_bus": [
     ],
     "stationapi:event_bus_client": [
@@ -45,8 +36,5 @@
   "depends": {
     "minecraft": "1.0.0-beta.7.3",
     "java": ">=21"
-  },
-  "suggests": {
-    "osl-networking": "*"
   }
 }

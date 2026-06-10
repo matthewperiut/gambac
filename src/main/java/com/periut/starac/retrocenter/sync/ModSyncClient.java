@@ -21,8 +21,8 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.network.ClientNetworkHandler;
 
 /**
- * Client download logic for the pre-login probe — OSL-free, fully
- * tick-driven (no worker threads blocking on the network; the held
+ * Client download logic for the pre-login probe — fully tick-driven
+ * (no worker threads blocking on the network; the held
  * connection is pumped by ModSyncScreen.tick()).
  */
 public final class ModSyncClient {

@@ -20,7 +20,7 @@ import com.periut.starac.retrocenter.RetroCenter;
 import net.fabricmc.loader.api.FabricLoader;
 
 /**
- * Server-side manifest of syncable mod jars (OSL-free; loader API only).
+ * Server-side manifest of syncable mod jars (loader API only).
  * Scans mods/, hashes each jar, extracts id/version from fabric.mod.json.
  * Jars listed in config/retrocenter/no-sync.txt (one file name per line)
  * are excluded — for server-only plugins/admin tools.

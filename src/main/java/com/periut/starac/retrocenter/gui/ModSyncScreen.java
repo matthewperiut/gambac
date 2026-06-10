@@ -34,7 +34,7 @@ import net.minecraft.client.network.ClientNetworkHandler;
  *                then shows why the child ended
  *   FAILED       sync error, [Back]
  *
- * OSL-free: reached purely via the vanilla-carrier probe.
+ * Reached purely via the vanilla-carrier probe.
  */
 public final class ModSyncScreen extends Screen {
 

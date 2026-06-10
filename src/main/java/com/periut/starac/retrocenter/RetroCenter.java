@@ -5,15 +5,9 @@ import com.periut.starac.retrocenter.bridge.HubBridge;
 import net.fabricmc.loader.api.FabricLoader;
 
 /**
- * OSL-free core state for the RetroCenter multiplayer hub feature.
- *
- * IMPORTANT CLASSLOADING RULE: this class (and everything in the bridge/,
- * child/ and profile/ packages) must never reference OSL types. All OSL
- * networking code lives behind the OSL entrypoints (RetroCenterInit,
- * RetroCenterClientInit, RetroCenterServerInit) and the sync/ package, which
- * are only ever classloaded when osl-networking is installed. When OSL is
- * absent the rest of starac (windowing, de-AWT, auth passthrough) works
- * exactly as before — the hub feature is simply dormant.
+ * Core state for the RetroCenter multiplayer hub feature. All sync
+ * networking runs over starac's own vanilla-carrier probe packet
+ * (RetroSyncPacket) — no external networking library involved.
  */
 public final class RetroCenter {
 
@@ -54,11 +48,6 @@ public final class RetroCenter {
 			selfInstance = self = HubBridge.instanceOf(RetroCenter.class);
 		}
 		return self != HubBridge.HUB || Boolean.getBoolean("retrocenter.child");
-	}
-
-	/** Whether OSL networking is installed; sync features are gated on this. */
-	public static boolean isSyncAvailable() {
-		return FabricLoader.getInstance().isModLoaded("osl-networking");
 	}
 
 	public static void captureLaunchArguments() {

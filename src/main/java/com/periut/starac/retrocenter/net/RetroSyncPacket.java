@@ -13,11 +13,10 @@ import net.minecraft.network.packet.Packet;
 /**
  * The pre-login carrier packet for retrocenter's mod-sync protocol.
  *
- * b1.7.3's packet table is global, not phase-gated — the same mechanism OSL
- * uses for its play-phase carrier (id 250) works during login too. This
- * packet is registered at {@link #ID} (configurable via
- * -Dretrocenter.packetId) on both sides by RetroCenterMain, entirely
- * OSL-free, and routes itself in {@link #apply}: server side → the login
+ * b1.7.3's packet table is global, not phase-gated, so a custom carrier
+ * packet works during login too. This packet is registered at {@link #ID}
+ * (configurable via -Dretrocenter.packetId) on both sides by
+ * RetroCenterMain and routes itself in {@link #apply}: server side → the login
  * handler's probe service, client side → the probe flow.
  *
  * Against a server WITHOUT retrocenter, sending this packet gets the client

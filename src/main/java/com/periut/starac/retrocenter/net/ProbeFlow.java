@@ -20,7 +20,7 @@ import net.minecraft.network.packet.handshake.HandshakePacket;
 
 /**
  * Client-side pre-login probe, leveraging the very first connection attempt
- * (OSL-free; client classes only — never loaded server-side).
+ * (client classes only — never loaded server-side).
  *
  * When the server's handshake reply arrives — the earliest bidirectional
  * moment, BEFORE LoginHello — the login is held and a sync QUERY goes out

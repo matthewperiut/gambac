@@ -11,7 +11,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
  * Shown by the HUB after a child instance ends with something to say:
  * a red title ("Minecraft Crashed" / "Disconnected") above a scrollable
  * text box with the full details (crash report, kick reason), and a
- * "Back to Main Menu" button. Scroll with the mouse wheel. OSL-free.
+ * "Back to Main Menu" button. Scroll with the mouse wheel.
  */
 public final class ChildEndScreen extends Screen {
 

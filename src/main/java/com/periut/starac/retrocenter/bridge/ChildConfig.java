@@ -10,7 +10,7 @@ package com.periut.starac.retrocenter.bridge;
  * new Session(username, sessionId) re-authenticates identically with no
  * retroauth changes and no extra plumbing.
  *
- * MUST stay OSL-free and JDK-only in its field types: this class is loaded
+ * MUST stay JDK-only in its field types: this class is loaded
  * by the hub's classloader and shared with child classloader trees.
  */
 public final class ChildConfig {

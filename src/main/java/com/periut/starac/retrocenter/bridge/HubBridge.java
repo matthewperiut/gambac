@@ -27,7 +27,7 @@ import java.util.WeakHashMap;
  * hub parks in Display.update() (releasing the GL context), the child's
  * Display.create() attaches once parked, and teardown reverses it.
  *
- * MUST stay OSL-free and reference only JDK types + ChildConfig.
+ * MUST reference only JDK types + ChildConfig.
  */
 public final class HubBridge {
 

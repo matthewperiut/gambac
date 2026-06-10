@@ -6,8 +6,8 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 import net.minecraft.network.packet.Packet;
 
 /**
- * Exposes b1.7.3's package-private packet-table registration — the same
- * trick OSL's networking impl uses for its own carrier packet.
+ * Exposes b1.7.3's package-private packet-table registration so the sync
+ * carrier packet can be registered at a custom id.
  */
 @Mixin(Packet.class)
 public interface PacketRegistryInvoker {

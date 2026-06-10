@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-/** Small sha256 helpers. OSL-free. */
+/** Small sha256 helpers. */
 public final class Sha256 {
 
 	private Sha256() {

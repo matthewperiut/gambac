@@ -23,12 +23,12 @@ import net.fabricmc.loader.api.FabricLoader;
  * </pre>
  *
  * Because the child boots with --gameDir pointing here, per-server stats,
- * options and screenshots come for free. OSL-free by design.
+ * options and screenshots come for free.
  */
 public final class ServerProfiles {
 
 	/** Mod jars copied from the hub's mods dir into every child profile. */
-	private static final String[] INFRA_MOD_PREFIXES = {"retroauth", "osl-", "networking", "core-", "entrypoints", "lifecycle-events"};
+	private static final String[] INFRA_MOD_PREFIXES = {"retroauth"};
 
 	private ServerProfiles() {
 	}
@@ -68,7 +68,7 @@ public final class ServerProfiles {
 	 * Seeds the child's mods folder with the infrastructure the child needs
 	 * beyond the server-synced mods:
 	 * 1. the starac "childshim" jar (starac minus org/lwjgl, see ChildClassLoader),
-	 * 2. local infra mods from the hub's own mods dir (retroauth, OSL modules).
+	 * 2. local infra mods from the hub's own mods dir (retroauth).
 	 *
 	 * In dev runs most infra is on the classpath (discovered as classpath
 	 * mods by the child's loader), so missing jars here are not fatal.

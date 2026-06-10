@@ -13,8 +13,8 @@ import net.minecraft.network.NetworkHandler;
 import net.minecraft.server.network.ServerLoginNetworkHandler;
 
 /**
- * Server side of the pre-login probe (OSL-free; only ever classloaded on
- * the server side — see RetroSyncPacket.apply).
+ * Server side of the pre-login probe (only ever classloaded on the server
+ * side — see RetroSyncPacket.apply).
  *
  * Stateless serving: every FILE_REQ names (sha256, chunkIndex) and gets one
  * FILE_CHUNK back. The login handler is marked active so the login timeout
@@ -34,7 +34,7 @@ public final class ServerProbe {
 
 	public static void handle(NetworkHandler handler, RetroSyncPacket packet) {
 		if (!(handler instanceof ServerLoginNetworkHandler)) {
-			return; // play-phase traffic is OSL's job
+			return; // the probe only runs during login
 		}
 		ServerLoginNetworkHandler login = (ServerLoginNetworkHandler) handler;
 		try {

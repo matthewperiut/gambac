@@ -8,8 +8,7 @@ import java.util.List;
 
 /**
  * The server's offer: which mod jars a client needs to play here.
- * Plain DataInput/DataOutput so the same codec serves both the OSL-free
- * pre-login probe and the OSL play-phase channels (as byte[]).
+ * Plain DataInput/DataOutput, carried over the pre-login probe.
  */
 public final class ModManifest {
 

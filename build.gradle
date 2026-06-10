@@ -56,12 +56,6 @@ dependencies {
 
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    // OSL — compile-time + dev-runtime. At RUNTIME OSL is OPTIONAL: every
-    // OSL-touching class is gated behind OSL's own entrypoints, so when
-    // osl-networking is absent the hub/sync feature is dormant and the rest
-    // of starac works unchanged (see RetroCenter javadoc).
-    ploceus.dependOsl(project.osl_version)
-
     api platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
     include platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
 
