@@ -49,6 +49,9 @@ public class Lwjgl3MixinPostProcessor implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (mixinClassName.contains(".mixin.stapi.")) {
+            return net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("stationapi");
+        }
         return true;
     }
 
