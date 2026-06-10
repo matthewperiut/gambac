@@ -4,7 +4,7 @@
   "version": "${version}",
 
   "name": "Staráč",
-  "description": "Modernizes Minecraft Beta libraries for the best experience on modern OSes. With OSL installed, adds RetroCenter: server-driven mod sync and per-server child instances sharing one window.",
+  "description": "Modernizes Minecraft Beta libraries for the best experience on modern OSes. Also Adds RetroCenter: server-driven mod sync and per-server child instances sharing one window.",
   "authors": [
     "Slainlight",
     "DanyGames2014"

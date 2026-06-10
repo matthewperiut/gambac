@@ -12,6 +12,7 @@ pluginManagement {
             name = 'Ornithe Snapshots'
             url = 'https://maven.ornithemc.net/snapshots'
         }
+        maven{ url = "https://matthewperiut.github.io/repository"}
         mavenLocal()
         gradlePluginPortal()
     }
