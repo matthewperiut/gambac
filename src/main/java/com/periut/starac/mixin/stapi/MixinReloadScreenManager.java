@@ -29,7 +29,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.opengl.GL11.*;
 
-@Mixin(value = ReloadScreenManager.class, remap = false)
+// priority 500: other mods (e.g. no_startup_screen) @Inject into openEarly();
+// Mixin only allows injecting into a merged method when the injector's
+// priority is HIGHER than the merging mixin's, so ours must sit below 1000.
+@Mixin(value = ReloadScreenManager.class, remap = false, priority = 500)
 public class MixinReloadScreenManager {
 
     @Shadow
@@ -49,6 +52,8 @@ public class MixinReloadScreenManager {
     public static void openEarly() throws LWJGLException {
         ReloadScreenManagerImpl.isMinecraftDone = false;
         applicationExecutor = ReloadScreenApplicationExecutor.INSTANCE;
+        // no_startup_screen injects AFTER this field write and cancels —
+        // keep it as a plain static assignment, matching vanilla stapi.
         currentReload = Optional.of(new CompositeResourceReload());
         //noinspection deprecation
         final Minecraft minecraft = (Minecraft) FabricLoader.getInstance().getGameInstance();
